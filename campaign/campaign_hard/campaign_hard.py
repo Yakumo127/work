@@ -1,10 +1,10 @@
 from module.base.timer import Timer
 from module.campaign.campaign_base import CampaignBase
+from module.exception import CampaignEnd
 from module.hard.equipment import HardEquipment
 from module.logger import logger
-from module.map.assets import MAP_PREPARATION, FLEET_PREPARATION
-from module.exception import CampaignEnd
-from module.ui.ui import CAMPAIGN_CHECK
+from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
+from module.ui.assets import CAMPAIGN_CHECK
 
 
 class Config:
@@ -39,7 +39,7 @@ class Campaign(CampaignBase, HardEquipment):
     # def fleet_preparation(self):
     #     self.equipment_take_on()
 
-    def _expected_combat_end(self, expected):
+    def _expected_end(self, expected):
         return 'in_stage'
 
     def clear_boss(self):

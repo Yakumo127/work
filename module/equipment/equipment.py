@@ -4,9 +4,8 @@ from module.base.timer import Timer
 from module.equipment.assets import *
 from module.logger import logger
 from module.ui.navbar import Navbar
-from module.ui.ui import UI
 from module.ui.switch import Switch
-
+from module.ui.ui import UI
 
 equipping_filter = Switch('Equiping_filter')
 equipping_filter.add_status('on', check_button=EQUIPPING_ON)
@@ -33,9 +32,9 @@ class Equipment(UI):
         while 1:
             if not swipe_timer.started() or swipe_timer.reached():
                 swipe_timer.reset()
-                self.device.swipe(vector=(distance, 0), box=SWIPE_AREA.area, random_range=SWIPE_RANDOM_RANGE,
-                                  padding=0, duration=(0.1, 0.12), name='EQUIP_SWIPE')
-                self.wait_until_appear(check_button)
+                self.device.swipe_vector(vector=(distance, 0), box=SWIPE_AREA.area, random_range=SWIPE_RANDOM_RANGE,
+                                         padding=0, duration=(0.1, 0.12), name='EQUIP_SWIPE')
+                self.wait_until_appear(check_button, offset=(30, 30))
                 swipe_count += 1
 
             self.device.screenshot()

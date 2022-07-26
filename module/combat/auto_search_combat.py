@@ -3,6 +3,7 @@ from module.campaign.assets import OCR_OIL
 from module.combat.assets import *
 from module.combat.combat import Combat
 from module.exception import CampaignEnd
+from module.handler.assets import AUTO_SEARCH_MAP_OPTION_ON
 from module.logger import logger
 from module.map.map_operation import MapOperation
 from module.ocr.ocr import Digit
@@ -12,7 +13,7 @@ OCR_OIL = Digit(OCR_OIL, name='OCR_OIL', letter=(247, 247, 247), threshold=128)
 
 class AutoSearchCombat(MapOperation, Combat):
     _auto_search_in_stage_timer = Timer(3, count=6)
-    _auto_search_confirm_low_emotion = False
+    _auto_search_status_confirm = False
     auto_search_oil_limit_triggered = False
 
     def _handle_auto_search_menu_missing(self):
@@ -32,6 +33,38 @@ class AutoSearchCombat(MapOperation, Combat):
             self._auto_search_in_stage_timer.reset()
 
         return False
+
+    def map_offensive_auto_search(self, skip_first_screenshot=True):
+        """
+        Pages:
+            in: in_map, MAP_OFFENSIVE
+            out: combat_appear
+        """
+        self.interval_reset(AUTO_SEARCH_MAP_OPTION_ON)
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
+
+            if self.handle_auto_search_map_option():
+                self.interval_reset(AUTO_SEARCH_MAP_OPTION_ON)
+                continue
+            # To handle a bug in Azur Lane game client.
+            # Auto search icon shows it's running but it's doing nothing
+            # when Alas exited from retirement and turned it on immediately.
+            # Monkey clicker, disable auto search every 3s, beginning not included
+            if self.appear(AUTO_SEARCH_MAP_OPTION_ON, offset=self._auto_search_offset, interval=3) \
+                   and self.appear_then_click(AUTO_SEARCH_MAP_OPTION_ON):
+                continue
+            if self.handle_combat_low_emotion():
+                continue
+            if self.handle_retirement():
+                continue
+
+            # Break
+            if self.is_combat_loading():
+                break
 
     def auto_search_watch_fleet(self, checked=False):
         """
@@ -78,6 +111,29 @@ class AutoSearchCombat(MapOperation, Combat):
 
         return checked
 
+    def _wait_until_in_map(self, skip_first_screenshot=True):
+        """
+        To handle a bug in Azur Lane game client.
+        Auto search icon shows it's running but it's doing nothing
+        when Alas exited from retirement and turned it on immediately.
+
+        Pages:
+            in: Exiting from retirement or enhancement
+            out: in_map()
+        """
+        timeout = Timer(3, count=6).start()
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
+
+            if self.is_in_map():
+                break
+            if timeout.reached():
+                logger.warning('Wait in_map after retirement timeout, assume it is in_map')
+                break
+
     def auto_search_moving(self, skip_first_screenshot=True):
         """
         Pages:
@@ -98,11 +154,14 @@ class AutoSearchCombat(MapOperation, Combat):
                 checked_fleet = self.auto_search_watch_fleet(checked_fleet)
                 checked_oil = self.auto_search_watch_oil(checked_oil)
             if self.handle_retirement():
+                self.map_offensive_auto_search()
                 continue
             if self.handle_auto_search_map_option():
                 continue
             if self.handle_combat_low_emotion():
-                self._auto_search_confirm_low_emotion = True
+                self._auto_search_status_confirm = True
+                continue
+            if self.handle_story_skip():
                 continue
             if self.handle_map_cat_attack():
                 continue
@@ -126,11 +185,13 @@ class AutoSearchCombat(MapOperation, Combat):
             out: combat status
         """
         logger.info('Auto search combat loading')
-        self.device.screenshot_interval_set(self.config.Optimization_CombatScreenshotInterval)
+        self.device.screenshot_interval_set('combat')
         while 1:
             self.device.screenshot()
 
             if self.handle_combat_automation_confirm():
+                continue
+            if self.handle_story_skip():
                 continue
             if self.handle_vote_popup():
                 continue
@@ -148,6 +209,7 @@ class AutoSearchCombat(MapOperation, Combat):
             submarine_mode = self.config.Submarine_Mode
         self.combat_auto_reset()
         self.combat_manual_reset()
+        self.device.click_record_clear()
         if emotion_reduce:
             self.emotion.reduce(fleet_index)
         auto = self.config.Fleet_Fleet1Mode if fleet_index == 1 else self.config.Fleet_Fleet2Mode
@@ -166,19 +228,21 @@ class AutoSearchCombat(MapOperation, Combat):
                     continue
             if self.handle_popup_confirm('AUTO_SEARCH_COMBAT_EXECUTE'):
                 continue
+            if self.handle_story_skip():
+                continue
             if self.handle_vote_popup():
                 continue
 
             # End
             if self.is_in_auto_search_menu() or self._handle_auto_search_menu_missing():
-                self.device.screenshot_interval_set(0)
+                self.device.screenshot_interval_set()
                 raise CampaignEnd
             if self.is_combat_executing():
                 continue
             if self.appear(BATTLE_STATUS_S) or self.appear(BATTLE_STATUS_A) or self.appear(BATTLE_STATUS_B) \
                     or self.appear(EXP_INFO_S) or self.appear(EXP_INFO_A) or self.appear(EXP_INFO_B) \
                     or self.is_auto_search_running():
-                self.device.screenshot_interval_set(0)
+                self.device.screenshot_interval_set()
                 break
 
     def auto_search_combat_status(self, skip_first_screenshot=True):
@@ -196,19 +260,33 @@ class AutoSearchCombat(MapOperation, Combat):
             else:
                 self.device.screenshot()
 
+            # End
+            if self.is_auto_search_running():
+                self._auto_search_status_confirm = False
+                break
+            if self.is_in_auto_search_menu() or self._handle_auto_search_menu_missing():
+                raise CampaignEnd
+
+            # Combat status
             if self.handle_get_ship():
                 continue
             if self.handle_popup_confirm('AUTO_SEARCH_COMBAT_STATUS'):
                 continue
             if self.handle_auto_search_map_option():
-                self._auto_search_confirm_low_emotion = False
+                self._auto_search_status_confirm = False
+                continue
+            if self.handle_urgent_commission():
+                continue
+            if self.handle_story_skip():
+                continue
+            if self.handle_guild_popup_cancel():
                 continue
             if self.handle_vote_popup():
                 continue
 
             # Handle low emotion combat
             # Combat status
-            if self._auto_search_confirm_low_emotion:
+            if self._auto_search_status_confirm:
                 if not exp_info and self.handle_get_ship():
                     continue
                 if self.handle_get_items():
@@ -220,19 +298,6 @@ class AutoSearchCombat(MapOperation, Combat):
                 if self.handle_exp_info():
                     exp_info = True
                     continue
-                if self.handle_urgent_commission():
-                    continue
-                if self.handle_story_skip():
-                    continue
-                if self.handle_guild_popup_cancel():
-                    continue
-
-            # End
-            if self.is_auto_search_running():
-                self._auto_search_confirm_low_emotion = False
-                break
-            if self.is_in_auto_search_menu() or self._handle_auto_search_menu_missing():
-                raise CampaignEnd
 
     def auto_search_combat(self, emotion_reduce=None, fleet_index=1):
         """

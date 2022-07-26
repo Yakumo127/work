@@ -1,7 +1,8 @@
-from ..campaign_war_archives.campaign_base import CampaignBase
-from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
 from module.logger import logger
+from module.map.map_base import CampaignMap
+from module.map.map_grids import RoadGrids, SelectedGrids
+
+from ..campaign_war_archives.campaign_base import CampaignBase
 
 MAP = CampaignMap('C1')
 MAP.camera_sight = (-4, -2, 4, 2)
@@ -17,12 +18,12 @@ MAP.map_data = """
     SP SP -- -- -- ME MB ++ ++
 """
 MAP.weight_data = """
-    10 10 10 10 10 10 10 10 10
-    10 10 10 10 10 10 10 10 10
-    10 10 10 10 10 10 10 10 10
-    10 10 10 10 10 10 10 10 10
-    10 10 10 10 10 10 10 10 10
-    10 10 10 10 10 10 10 10 10
+    50 50 50 50 50 50 50 50 50
+    50 50 50 50 50 50 50 50 50
+    50 50 50 50 50 50 50 50 50
+    50 50 50 50 50 50 50 50 50
+    50 50 50 50 50 50 50 50 50
+    50 50 50 50 50 50 50 50 50
 """
 MAP.spawn_data = [
     {'battle': 0, 'enemy': 2, 'siren': 2},
@@ -77,12 +78,15 @@ class Config:
 
 class Campaign(CampaignBase):
     MAP = MAP
+    ENEMY_FILTER = '1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C'
 
     def battle_0(self):
         if self.clear_siren():
+            return True
+        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
             return True
 
         return self.battle_default()
 
     def battle_4(self):
-        self.fleet_boss.capture_clear_boss()
+        return self.clear_boss()

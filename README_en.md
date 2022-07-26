@@ -4,7 +4,9 @@
 
 #### Discord [![](https://img.shields.io/discord/720789890354249748?logo=discord&logoColor=ffffff&color=4e4c97)](https://discord.gg/AQN6GeJ) QQ Group ![](https://img.shields.io/badge/QQ%20Group-1087735381-4e4c97)
 
-Alas, an Azur Lane automation tool with GUI (Supports CN, EN, JP, TW, able to support other servers), designed for 24/7 running scenes, can take over almost all Azur Lane gameplay. Azur Lane, as a mobile game, has entered the late stage of its life cycle. During the period from now to the server down, please reduce the time spent on the Azur Lane and leave everything to Alas.
+Azur Lane bot with GUI (Supports CN, EN, JP, TW, able to support other servers), designed for 24/7 running scenes, can take over almost all Azur Lane gameplay. Azur Lane, as a mobile game, has entered the late stage of its life cycle. During the period from now to the server down, please reduce the time spent on the Azur Lane and leave everything to Alas.
+
+Alas is a free open source software, link: https://github.com/LmeSzinc/AzurLaneAutoScript
 
 EN support, thanks **[@whoamikyo](https://github.com/whoamikyo)** and **[@nEEtdo0d](https://github.com/nEEtdo0d)**.
 
@@ -25,14 +27,14 @@ GUI development, thanks **[@18870](https://github.com/18870)** , say HURRAY.
 - **Farm**: Main chapter, events, raids, 1-1 affinity farming, 7-2 mystery farming, 12-2 medium leveling, 12-4 large leveling, gems farming.
 - **Reward**: Commission, tactical class, research, dorm, meowfficer, guild, missions, shop, shipyard, gacha, data key.
 - **Daily**: Daily mission, hard, exercise, SOS, event daily AB, event daily SP, raid daily, war archives.
-- **Opsi**: Ash beacon assist, Opsi monthly explore, Opsi daily, obscured zones, meowfficer farming.
+- **Opsi**: Ash beacon assist, Opsi monthly explore, Opsi daily, obscured zones, meowfficer farming, abyssal zones, siren strongholds.
 
 #### Highlighted Features
 
 - **Mood Control**: Calculates mood consumption, keep exp bonus or prevent red faces.
 - **Event Exploring**: Able to run without clear mode, also handles fleet moving limits and other event mechanism.
 - **Seamless Reward**: Calculates the finish time of research, commission, etc. Receive reward and dispatch again when time reached.
-- **Operation Siren**: Receive Opsi dailies, purchase port shops, do Opsi dailies, do meowfficer farming, purchase Akashi's shop, clear obscured zones every 30 min.
+- **Operation Siren**: Receive Opsi dailies, purchase port shops, do Opsi dailies, do meowfficer farming, purchase Akashi's shop, clear obscured zones every 30 min, clear abyssal and strongholds. ~~What the ... is the strategic search, like sh*t, compares to Alas.~~
 - **Opsi Explore**: After Opsi monthly reset, re-explore all zones without special radar (5000 oil item)
 
 
@@ -58,7 +60,7 @@ Spend at least 5 minutes for thinking and preparing, before someone spend his/he
 - **Unable to handle network issues**
 - **Low-end PCs might have issues**, Low-end PCs have a screenshot time cost over 1s, while middle-end costs about 0.5s, high-end costs about 0.3s.
 - **Exercise may too late to quit when it's going to failed**
-- **NemuPlayer does not support long taps send from minitouch, unable to feed dorm**. NemuPlayer is not recommended.
+- **NemuPlayer does not support two-finger zoom out send from minitouch, unable to collect loves and coins in dorm**. NemuPlayer is not recommended.
 - **Swipe may be treated as click if emulator stuck randomly**
 
 
@@ -79,6 +81,14 @@ The core of an Azur Lane bot is map detection. If you simply use `Template match
 ```
 
 Development documents, refer to [WIKI](https://github.com/LmeSzinc/AzurLaneAutoScript/wiki).
+
+
+
+## Join Development
+
+We will occasionally publish future work on [Issues](https://github.com/LmeSzinc/AzurLaneAutoScript/issues) and mark it as `help wanted`, feel free to submit [Pull Requests](https://github.com.com/LmeSzinc/AzurLaneAutoScript/pulls) to Alas, we will read every line of your code.
+
+Oh yeah, don't forget to read the [development documentation](https://github.com/LmeSzinc/AzurLaneAutoScript/wiki/1.-Start).
 
 
 

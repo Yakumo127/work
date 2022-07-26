@@ -21,7 +21,11 @@ To add a new event, add a new row in here, and run `python -m dev_tools.event_ex
 | 20180226   | war archives 20190221 en | Winter\'s Crown                | 凛冬王冠               | Winter\'s Crown                  | 凛冽なりし冬の王冠                   | 凜冬王冠             |
 | 20180607   | war archives 20180607 cn | Ink Stained Steel Sakura       | 墨染的钢铁之花         | Ink Stained Steel Sakura         | 墨染まりし鋼の桜                     | 墨染的鋼鐵之花       |
 | 20180726   | war archives 20180726 cn | Iris of Light and Dark         | 光与影的鸢尾之华       | Iris of Light and Dark           | 光と影のアイリス                     | 光與影的鳶尾之華     |
-| 20180726   | war archives 20181227 cn | Crimson Echoes                 | 苍红的回响           | Crimson Echoes                    | 縹映る深緋の残響                          | 蒼紅的迴響     |
+| 20210121   | war archives 20181227 cn | Crimson Echoes                 | 苍红的回响           | Crimson Echoes                    | 縹映る深緋の残響                          | 蒼紅的迴響     |
+| 20210513   | war archives 20200820 cn | Scherzo of Iron and Blood      | 铁血音符誓言       | Scherzo of Iron and Blood        | 黒鉄の楽章 誓いの海                | -                    |
+| 20220113   | war archives 20190911 cn | Empyreal Tragicomedy           | 神圣的悲喜剧       | Empyreal Tragicomedy                | 悲歎せし焔海の詩             | -                    |
+| 20220407   | war archives 20210325 cn | Ashen Simulacrum               | 箱庭疗法          | Ashen Simulacrum                 | 開かれし紺碧の砂箱            | -                    |
+| 20220721   | war archives 20210624 cn | Swirling Cherry Blossoms       | 浮樱影华           | Swirling Cherry Blossoms       | 翳りし満ちる影の華                 | -                    |
 | 20200227   | event 20200227 cn        | Northern Overture              | 北境序曲               | Northern Overture                | 凍絶の北海                           | -                    |
 | 20200312   | event 20200312 cn        | The Solomon Ranger             | 复刻斯图尔特的硝烟     | The Solomon Ranger Rerun         | 南洋に靡く硝煙（復刻）               | -                    |
 | 20200326   | event 20200326 cn        | Microlayer Medley              | 微层混合               | Microlayer Medley                | 闇靄払う銀翼                         | -                    |
@@ -29,7 +33,7 @@ To add a new event, add a new row in here, and run `python -m dev_tools.event_ex
 | 20200507   | event 20200507 cn        | The Way Home in the Night      | 夜幕下的归途           | The Way Home in the Night        | 帰路は海色の陰りへと                 | -                    |
 | 20200521   | event 20200521 cn        | Skybound Oratorio              | 穹顶下的圣咏曲         | -                                | 神穹を衝く聖歌                       | -                    |
 | 20200521   | event 20200521 en        | Iris of Light and Dark         | -                      | Iris of Light and Dark Rerun     | -                                    | -                    |
-| 20200603   | event 20200603 cn        | Stars of the Shimmering Fjord  | 峡湾间的反击           | -                                | 峡湾間の反撃                         | -                    |
+| 20200603   | event 20200603 cn        | Counterattack Within the Fjord | 峡湾间的反击           | -                                | 峡湾間の反撃                         | -                    |
 | 20200603   | event 20200603 en        | Prelude under the Moon         | -                      | Prelude under the Moon Rerun     | -                                    | -                    |
 | 20200611   | event 20200611 en        | Skybound Oratorio              | -                      | Skybound Oratorio                | -                                    | -                    |
 | 20200624   | raid 20200624            | Air Raid Drills with Essex     | 复刻特别演习埃塞克斯级 | Air Raid Drills with Essex Rerun | 特別演習超空強襲波（復刻）           | 特別演習埃塞克斯級   |
@@ -74,3 +78,28 @@ To add a new event, add a new row in here, and run `python -m dev_tools.event_ex
 | 20211028   | event 20211028 cn        | Skybound Oratorio              | 复刻穹顶下的圣咏曲     | Skybound Oratorio Rerun          | 神穹を衝く聖歌（復刻）               | -                    |
 | 20211028   | event 20211028 tw        | Iris of Light and Dark         | -                      | -                                | -                                    | 復刻光與影的鳶尾之華 |
 | 20211111   | event 20211111 cn        | The Flame-Touched Dagger       | 杰诺瓦的焰火           | The Flame-Touched Dagger         | 燈火のシニエ                         | -                    |
+| 20211125   | event 20211125 cn        | World-spanning Arclight        | 交汇世界的弧光         | World-spanning Arclight          | 弧光は交わる世界にて                 | -                    |
+| 20211130   | event 20211125 cn        | World-spanning Arclight        | -                      | -                                | -                                    | 交匯世界的弧光       |
+| 20211214   | event 20200603 cn        | Counterattack Within the Fjord | -                      | -                                | -                                    | 峽灣間的反擊         |
+| 20211229   | event 20211229 cn        | Tower of Transcendence         | 逆转彩虹之塔           | Tower of Transcendence           | 遡望せし虹彩の塔                     | -                    |
+| 20211230   | event 20201229 cn        | Inverted Orthant               | -                      | -                                | -                                    | 負象限作戰           |
+| 20220127   | raid 20220127            | Mystery Investigation | 演习神秘事件调查      | Mystery Investigation | 秘密事件調査 | - |
+| 20220210   | event 20220210 cn        | Northern Overture Rerun              | 复刻北境序曲               | Northern Overture Rerun     | 凍絶の北海（復刻）                           | -                    |
+| 20220224   | event 20210225 cn        | Khorovod of Dawn's Rime        | -                      | -                                | -                                    | 破曉冰華             |
+| 20220224 | event 20220224 cn | Abyssal Refrain | 深度回音 | Abyssal Refrain | 鳴動せし星霜の淵 | - |
+| 20220310 | event 20200603 cn | Counterattack Within the Fjord | 复刻峡湾间的反击 | Counterattack Within the Fjord Rerun | 峡湾間の反撃（復刻） | - |
+| 20220310 | event 20220310 tw | The Solomon Ranger | - | - | - | 復刻斯圖爾特的硝煙 |
+| 20220324 | event 20220324 cn | Virtual Tower | 虚像构筑之塔 | Virtual Tower | 幻像の塔 | - |
+| 20220324 | event 20210422 cn | Daedalian Hymn | - | - | - | 復興的讚美詩 |
+| 20220407 | event 20220407 tw | Crimson Echoes | - | - | - | 蒼紅的迴響(復刻) |
+| 20220414 | event 20220414 cn | Aurora Noctis | 复刻永夜幻光 | Aurora Noctis Rerun | 極夜照らす幻光（復刻） | - |
+| 20220428 | event 20220428 cn | Rondo at Rainbow's End | 虹彩的终幕曲 | Rondo at Rainbow's End | 吟ずる瑠璃の楽章 | - |
+| 20220505 | raid 20200624 | Air Raid Drills with Essex | - | - | - | 特別演習埃塞克斯級(復刻) |
+| 20220526 | event 20220526 cn | Pledge of the Radiant Court | 泠誓光庭 | Pledge of the Radiant Court | 诚閃の剣 搖光の城 | - |
+| 20220526 | event 20210527 cn | Mirror Involution | - | - | - | 鏡位螺旋 |
+| 20220616 | event 20201012 cn | Sundered Blue | 复刻划破海空之翼 | Sundered Blue Rerun | 奔る彩帆の青（復刻） | - |
+| 20220616 | event 20200820 cn | Scherzo of Iron and Blood | - | - | - | 復刻鐵血音符誓言 |
+| 20220630 | raid 20210708 | Cross Wave | - | - | - | 復刻穿越彼方的水線 |
+| 20220630 | raid 20220630 | Angel of Iris | 来自鸢尾的天使 | Angel of Iris | アイリスの天使 | - |
+| 20220714 | event 20201029 cn | Universe in Unison | - | - | - | 激唱的UNIVERSE |
+| 20220714 | event 20200917 cn | Dreamwaker's Butterfly | 复刻蝶海梦花 | Dreamwaker's Butterfly Rerun | 刹那觀る胡蝶の夢（復刻） | - |

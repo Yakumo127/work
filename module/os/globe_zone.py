@@ -2,7 +2,6 @@ import numpy as np
 
 from module.base.decorator import cached_property
 from module.exception import ScriptError
-from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.os.globe_detection import GLOBE_MAP_SHAPE
 from module.os.map_data import DIC_OS_MAP
@@ -26,15 +25,15 @@ class Zone:
     # 1 for upper-left, 2 for upper-right, 3 for bottom-left, 4 for bottom-right, 5 for center
     region: int
 
-    is_port: int
-    is_azur_port: int
+    is_port: bool
+    is_azur_port: bool
 
     def __init__(self, zone_id, data):
         self.zone_id = zone_id
         self.__dict__.update(data)
         self.location = self.point_convert(self.area_pos)
         self.mission = self.point_convert(np.add(self.area_pos, self.offset_pos))
-        self.is_port = self.zone_id in [0, 1, 2, 3, 4, 5, 6, 7]
+        self.is_port = self.zone_id in [0, 1, 2, 3, 4, 5, 6, 7, 154]
         self.is_azur_port = self.zone_id in [0, 1, 2, 3]
 
     @staticmethod
@@ -51,7 +50,7 @@ class Zone:
         Returns:
             str: Such as `[3|圣彼得伯格|St. Petersburg|ペテルブルク|聖彼得堡]`
         """
-        return f'[{self.zone_id}|{self.cn}|{self.en}|{self.jp}|{self.tw}]'
+        return f'[{self.zone_id}|{self.en}]'
 
     __repr__ = __str__
 
@@ -88,18 +87,29 @@ class ZoneManager:
 
     def name_to_zone(self, name):
         """
+        Convert a name from various format to zone instance.
+
         Args:
             name (str, int, Zone): Name in CN/EN/JP/TW, zone id, or Zone instance.
 
         Returns:
             Zone:
+
+        Raises:
+            ScriptError: If Unable to find such zone.
         """
         if isinstance(name, Zone):
             return name
         elif isinstance(name, int):
-            return self.zones.select(zone_id=name)[0]
+            try:
+                return self.zones.select(zone_id=name)[0]
+            except IndexError:
+                raise ScriptError(f'Unable to find OS globe zone: {name}')
         elif isinstance(name, str) and name.isdigit():
-            return self.zones.select(zone_id=int(name))[0]
+            try:
+                return self.zones.select(zone_id=int(name))[0]
+            except IndexError:
+                raise ScriptError(f'Unable to find OS globe zone: {name}')
         else:
             def parse_name(n):
                 n = str(n).replace(' ', '').lower()
@@ -115,7 +125,6 @@ class ZoneManager:
                     return zone
                 if name == parse_name(zone.tw):
                     return zone
-            logger.warning(f'Unable to find OS globe zone: {name}')
             raise ScriptError(f'Unable to find OS globe zone: {name}')
 
     def zone_nearest_azur_port(self, zone):
@@ -136,14 +145,19 @@ class ZoneManager:
         ports = ports.sort_by_camera_distance(camera=tuple(zone.location))
         return ports[0]
 
-    def zone_select(self, **kwargs):
+    def zone_select(self, hazard_level):
         """
         Similar to `self.zone.select(**kwargs)`, but delete zones in region 5.
 
         Args:
-            **kwargs: Properties of zone.
+            hazard_level: 1-6, or 10 for center zones.
 
         Returns:
             SelectedGrids: SelectedGrids containing zone objects.
         """
-        return self.zones.select(**kwargs).delete(self.zones.select(region=5))
+        if 1 <= hazard_level <= 6:
+            return self.zones.select(hazard_level=hazard_level).delete(self.zones.select(region=5))
+        elif hazard_level == 10:
+            return self.zones.select(region=5)
+        else:
+            raise ScriptError(f'Invalid hazard_level of zones: {hazard_level}')

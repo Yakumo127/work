@@ -1,30 +1,29 @@
 import os
 import re
+import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import inflection
 from cached_property import cached_property
 
-import module.config.server as server
 from module.config.config import AzurLaneConfig, TaskEnd
-from module.config.config_updater import ConfigUpdater
 from module.config.utils import deep_get, deep_set
 from module.exception import *
 from module.logger import logger
 
 
 class AzurLaneAutoScript:
+    stop_event: threading.Event = None
+
     def __init__(self, config_name='alas'):
+        logger.hr('Start', level=0)
         self.config_name = config_name
-        ConfigUpdater().update_config(config_name)
 
     @cached_property
     def config(self):
         try:
             config = AzurLaneConfig(config_name=self.config_name)
-            # Set server before loading any buttons.
-            server.server = deep_get(config.data, keys='Alas.Emulator.Server', default='cn')
             return config
         except RequestHumanTakeover:
             logger.critical('Request human takeover')
@@ -39,12 +38,16 @@ class AzurLaneAutoScript:
             from module.device.device import Device
             device = Device(config=self.config)
             return device
+        except RequestHumanTakeover:
+            logger.critical('Request human takeover')
+            exit(1)
         except Exception as e:
             logger.exception(e)
             exit(1)
 
     def run(self, command):
         try:
+            self.device.screenshot()
             self.__getattribute__(command)()
             return True
         except TaskEnd:
@@ -56,17 +59,23 @@ class AzurLaneAutoScript:
         except (GameStuckError, GameTooManyClickError) as e:
             logger.warning(e)
             self.save_error_log()
-            logger.warning(f'Game stuck, {self.config.Emulator_PackageName} will be restarted in 10 seconds')
+            logger.warning(f'Game stuck, {self.device.package} will be restarted in 10 seconds')
             logger.warning('If you are playing by hand, please stop Alas')
             self.config.task_call('Restart')
             self.device.sleep(10)
             return False
-        except LogisticsRefreshBugHandler as e:
+        except GameBugError as e:
             logger.warning(e)
             self.save_error_log()
+            logger.warning('An error has occurred in Azur Lane game client, Alas is unable to handle')
+            logger.warning(f'Restarting {self.device.package} to fix it')
             self.config.task_call('Restart')
             self.device.sleep(10)
             return False
+        except GamePageUnknownError:
+            logger.critical('Game page unknown')
+            self.save_error_log()
+            exit(1)
         except ScriptError as e:
             logger.critical(e)
             logger.critical('This is likely to be a mistake of developers, but sometimes just random issues')
@@ -84,7 +93,9 @@ class AzurLaneAutoScript:
         Save last 60 screenshots in ./log/error/<timestamp>
         Save logs to ./log/error/<timestamp>/log.txt
         """
-        from module.handler.sensitive_info import handle_sensitive_image, handle_sensitive_logs
+        from module.base.utils import save_image
+        from module.handler.sensitive_info import (handle_sensitive_image,
+                                                   handle_sensitive_logs)
         if self.config.Error_SaveError:
             if not os.path.exists('./log/error'):
                 os.mkdir('./log/error')
@@ -94,12 +105,13 @@ class AzurLaneAutoScript:
             for data in self.device.screenshot_deque:
                 image_time = datetime.strftime(data['time'], '%Y-%m-%d_%H-%M-%S-%f')
                 image = handle_sensitive_image(data['image'])
-                image.save(f'{folder}/{image_time}.png')
+                save_image(image, f'{folder}/{image_time}.png')
             with open(logger.log_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
                 start = 0
                 for index, line in enumerate(lines):
-                    if re.search('\+-{15,}\+', line):
+                    line = line.strip(' \r\t\n')
+                    if re.match('^═{15,}$', line):
                         start = index
                 lines = lines[start - 2:]
                 lines = handle_sensitive_logs(lines)
@@ -115,8 +127,15 @@ class AzurLaneAutoScript:
         LoginHandler(self.config, device=self.device).app_start()
 
     def goto_main(self):
+        from module.handler.login import LoginHandler
         from module.ui.ui import UI
-        UI(self.config, device=self.device).ui_goto_main()
+        if self.device.app_is_running():
+            logger.info('App is already running, goto main page')
+            UI(self.config, device=self.device).ui_goto_main()
+        else:
+            logger.info('App is not running, start app and goto main page')
+            LoginHandler(self.config, device=self.device).app_start()
+            UI(self.config, device=self.device).ui_goto_main()
 
     def research(self):
         from module.research.research import RewardResearch
@@ -166,8 +185,23 @@ class AzurLaneAutoScript:
         from module.data_key.data_key import RewardDataKey
         RewardDataKey(config=self.config, device=self.device).run()
 
+    def supply_pack(self):
+        from module.supply_pack.supply_pack import SupplyPack
+        SupplyPack(config=self.config, device=self.device).run()
+
+    def battle_pass(self):
+        from module.battle_pass.battle_pass import BattlePass
+        BattlePass(config=self.config, device=self.device).run()
+
+    def meta_reward(self):
+        from module.meta_reward.meta_reward import MetaReward
+        MetaReward(config=self.config, device=self.device).run()
+
     def daily(self):
-        from module.daily.daily import Daily
+        if self.config.SERVER == 'tw':
+            from module.daily.daily_tw import Daily
+        else:
+            from module.daily.daily import Daily
         Daily(config=self.config, device=self.device).run()
 
     def hard(self):
@@ -187,6 +221,10 @@ class AzurLaneAutoScript:
         CampaignWarArchives(config=self.config, device=self.device).run(
             name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
 
+    def raid_daily(self):
+        from module.raid.daily import RaidDaily
+        RaidDaily(config=self.config, device=self.device).run()
+
     def event_ab(self):
         from module.event.campaign_ab import CampaignAB
         CampaignAB(config=self.config, device=self.device).run()
@@ -199,6 +237,10 @@ class AzurLaneAutoScript:
         from module.event.campaign_sp import CampaignSP
         CampaignSP(config=self.config, device=self.device).run()
 
+    def maritime_escort(self):
+        from module.event.maritime_escort import MaritimeEscort
+        MaritimeEscort(config=self.config, device=self.device).run()
+
     def opsi_ash_assist(self):
         from module.os_ash.ash import AshBeaconAssist
         AshBeaconAssist(config=self.config, device=self.device).run()
@@ -207,6 +249,10 @@ class AzurLaneAutoScript:
         from module.campaign.os_run import OSCampaignRun
         OSCampaignRun(config=self.config, device=self.device).opsi_explore()
 
+    def opsi_shop(self):
+        from module.campaign.os_run import OSCampaignRun
+        OSCampaignRun(config=self.config, device=self.device).opsi_shop()
+
     def opsi_daily(self):
         from module.campaign.os_run import OSCampaignRun
         OSCampaignRun(config=self.config, device=self.device).opsi_daily()
@@ -214,6 +260,14 @@ class AzurLaneAutoScript:
     def opsi_obscure(self):
         from module.campaign.os_run import OSCampaignRun
         OSCampaignRun(config=self.config, device=self.device).opsi_obscure()
+
+    def opsi_abyssal(self):
+        from module.campaign.os_run import OSCampaignRun
+        OSCampaignRun(config=self.config, device=self.device).opsi_abyssal()
+
+    def opsi_stronghold(self):
+        from module.campaign.os_run import OSCampaignRun
+        OSCampaignRun(config=self.config, device=self.device).opsi_stronghold()
 
     def opsi_meowfficer_farming(self):
         from module.campaign.os_run import OSCampaignRun
@@ -224,7 +278,22 @@ class AzurLaneAutoScript:
         CampaignRun(config=self.config, device=self.device).run(
             name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
 
+    def main2(self):
+        from module.campaign.run import CampaignRun
+        CampaignRun(config=self.config, device=self.device).run(
+            name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
+
+    def main3(self):
+        from module.campaign.run import CampaignRun
+        CampaignRun(config=self.config, device=self.device).run(
+            name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
+
     def event(self):
+        from module.campaign.run import CampaignRun
+        CampaignRun(config=self.config, device=self.device).run(
+            name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
+
+    def event2(self):
         from module.campaign.run import CampaignRun
         CampaignRun(config=self.config, device=self.device).run(
             name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
@@ -232,11 +301,6 @@ class AzurLaneAutoScript:
     def raid(self):
         from module.raid.run import RaidRun
         RaidRun(config=self.config, device=self.device).run()
-
-    def c11_affinity_farming(self):
-        from module.campaign.run import CampaignRun
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
 
     def c72_mystery_farming(self):
         from module.campaign.run import CampaignRun
@@ -258,47 +322,79 @@ class AzurLaneAutoScript:
         GemsFarming(config=self.config, device=self.device).run(
             name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
 
-    @staticmethod
-    def wait_until(future):
+    def wait_until(self, future):
         """
         Wait until a specific time.
 
         Args:
             future (datetime):
+
+        Returns:
+            bool: True if wait finished, False if config changed.
         """
-        seconds = future.timestamp() - datetime.now().timestamp() + 1
-        if seconds > 0:
-            time.sleep(seconds)
-        else:
-            logger.warning(f'Wait until {str(future)}, but sleep length < 0, skip waiting')
+        future = future + timedelta(seconds=1)
+        self.config.start_watching()
+        while 1:
+            if datetime.now() > future:
+                return True
+            if self.stop_event is not None:
+                if self.stop_event.is_set():
+                    logger.info("Update event detected")
+                    logger.info(f"[{self.config_name}] exited. Reason: Update")
+                    exit(0)
+
+            time.sleep(5)
+
+            if self.config.should_reload():
+                return False
 
     def get_next_task(self):
         """
         Returns:
             str: Name of the next task.
         """
-        task = self.config.get_next()
-        self.config.task = task
-        self.config.bind(task)
+        while 1:
+            task = self.config.get_next()
+            self.config.task = task
+            self.config.bind(task)
 
-        if task.next_run > datetime.now():
-            logger.info(f'Wait until {task.next_run} for task `{task.command}`')
-            method = self.config.Optimization_WhenTaskQueueEmpty
-            if method == 'close_game':
-                logger.info('Close game during wait')
-                self.device.app_stop()
-                self.wait_until(task.next_run)
-                self.run('start')
-            elif method == 'goto_main':
-                logger.info('Goto main page during wait')
-                self.run('goto_main')
-                self.wait_until(task.next_run)
-            elif method == 'stay_there':
-                self.wait_until(task.next_run)
-            else:
-                logger.warning(f'Invalid Optimization_WhenTaskQueueEmpty: {method}, fallback to stay_there')
-                self.wait_until(task.next_run)
+            from module.base.resource import release_resources
+            if self.config.task.command != 'Alas':
+                release_resources(next_task=task.command)
 
+            if task.next_run > datetime.now():
+                logger.info(f'Wait until {task.next_run} for task `{task.command}`')
+                method = self.config.Optimization_WhenTaskQueueEmpty
+                if method == 'close_game':
+                    logger.info('Close game during wait')
+                    self.device.app_stop()
+                    release_resources()
+                    if not self.wait_until(task.next_run):
+                        del self.__dict__['config']
+                        continue
+                    self.run('start')
+                elif method == 'goto_main':
+                    logger.info('Goto main page during wait')
+                    self.run('goto_main')
+                    release_resources()
+                    if not self.wait_until(task.next_run):
+                        del self.__dict__['config']
+                        continue
+                elif method == 'stay_there':
+                    logger.info('Stay there during wait')
+                    release_resources()
+                    if not self.wait_until(task.next_run):
+                        del self.__dict__['config']
+                        continue
+                else:
+                    logger.warning(f'Invalid Optimization_WhenTaskQueueEmpty: {method}, fallback to stay_there')
+                    release_resources()
+                    if not self.wait_until(task.next_run):
+                        del self.__dict__['config']
+                        continue
+            break
+
+        AzurLaneConfig.is_hoarding_task = False
         return task.command
 
     def loop(self):
@@ -308,6 +404,11 @@ class AzurLaneAutoScript:
         failure_record = {}
 
         while 1:
+            if self.stop_event is not None:
+                if self.stop_event.is_set():
+                    logger.info("Update event detected")
+                    logger.info(f"Alas [{self.config_name}] exited.")
+                    break
             task = self.get_next_task()
 
             # Skip first restart
@@ -321,7 +422,6 @@ class AzurLaneAutoScript:
             logger.info(f'Scheduler: Start task `{task}`')
             self.device.stuck_record_clear()
             self.device.click_record_clear()
-            self.device.screenshot()
             logger.hr(task, level=0)
             success = self.run(inflection.underscore(task))
             logger.info(f'Scheduler: End task `{task}`')
@@ -333,9 +433,9 @@ class AzurLaneAutoScript:
             deep_set(failure_record, keys=task, value=failed)
             if failed >= 3:
                 logger.critical(f"Task `{task}` failed 3 or more times.")
-                logger.critical("Possible reason: You haven't used it correctly. "
+                logger.critical("Possible reason #1: You haven't used it correctly. "
                                 "Please read the help text of the options.")
-                logger.critical("Possible reason: There is a problem with this task. "
+                logger.critical("Possible reason #2: There is a problem with this task. "
                                 "Please contact developers or try to fix it yourself.")
                 logger.critical('Request human takeover')
                 exit(1)

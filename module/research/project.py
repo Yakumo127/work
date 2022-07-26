@@ -1,5 +1,6 @@
 import re
 from datetime import timedelta
+from functools import partial
 
 from scipy import signal
 
@@ -22,12 +23,13 @@ OCR_RESEARCH = [OCR_RESEARCH_1, OCR_RESEARCH_2, OCR_RESEARCH_3, OCR_RESEARCH_4, 
 OCR_RESEARCH = Ocr(OCR_RESEARCH, name='RESEARCH', threshold=64, alphabet='0123456789BCDEGHQTMIULRF-')
 RESEARCH_DETAIL_GENRE = [DETAIL_GENRE_B, DETAIL_GENRE_C, DETAIL_GENRE_D, DETAIL_GENRE_E, DETAIL_GENRE_G,
                          DETAIL_GENRE_H_0, DETAIL_GENRE_H_1, DETAIL_GENRE_Q, DETAIL_GENRE_T]
-FILTER_REGEX = re.compile('(s[1234])?'
+FILTER_REGEX = re.compile('(s[12345])?'
                           '-?'
                           '(neptune|monarch|ibuki|izumo|roon|saintlouis'
                           '|seattle|georgia|kitakaze|azuma|friedrich'
                           '|gascogne|champagne|cheshire|drake|mainz|odin'
-                          '|anchorage|hakuryu|agir|august|marcopolo)?'
+                          '|anchorage|hakuryu|agir|august|marcopolo'
+                          '|plymouth|rupprecht|harbin|chkalov|brest)?'
                           '(dr|pry)?'
                           '([bcdeghqt])?'
                           '-?'
@@ -49,7 +51,7 @@ def get_research_series(image):
     -------               ---    v
 
     Args:
-        image (PIL.Image.Image):
+        image (np.ndarray):
 
     Returns:
         list[int]: Such as [1, 1, 1, 2, 3]
@@ -59,10 +61,10 @@ def get_research_series(image):
     # 2021.07.18 Letter IV is now smaller than I, II, III, since the maintenance in 07.15.
     #   The "/" of the "V" in IV become darker because of anti-aliasing.
     #   So lower height to 160 to have a better detection.
-    parameters = {'height': 160, 'prominence': 50}
+    parameters = {'height': 160, 'prominence': 50, 'width': 1}
 
     for button in RESEARCH_SERIES:
-        im = color_similarity_2d(image.crop(button.area).resize((46, 25)), color=(255, 255, 255))
+        im = color_similarity_2d(resize(crop(image, button.area), (46, 25)), color=(255, 255, 255))
         peaks = [len(signal.find_peaks(row, **parameters)[0]) for row in im[5:-5]]
         upper, lower = max(peaks), min(peaks)
         # print(peaks)
@@ -70,6 +72,8 @@ def get_research_series(image):
             series = upper
         elif upper == 3 and lower == 2:
             series = 4
+        elif upper == 2 and lower == 1:
+            series = 5
         else:
             series = 0
             logger.warning(f'Unknown research series: button={button}, upper={upper}, lower={lower}')
@@ -81,7 +85,7 @@ def get_research_series(image):
 def get_research_name(image):
     """
     Args:
-        image (PIL.Image.Image):
+        image (np.ndarray):
 
     Returns:
         list[str]: Such as ['D-057-UL', 'D-057-UL', 'D-057-UL', 'D-057-UL', 'D-057-UL']
@@ -95,7 +99,7 @@ def get_research_name(image):
 def get_research_finished(image):
     """
     Args:
-        image: Pillow image
+        image (np.ndarray):
 
     Returns:
         int: Index of the finished project, 0 to 4. Return None if no project finished.
@@ -137,8 +141,8 @@ def parse_time(string):
 def match_template(image, template, area, offset=30, threshold=0.85):
     """
     Args:
-        image (PIL.Image.Image): Screenshot
-        template (PIL.Image.Image):
+        image (np.ndarray): Screenshot
+        template (np.ndarray):
         area (tuple): Crop area of image.
         offset (int, tuple): Detection area offset.
         threshold (float): 0-1. Similarity. Lower than this value will return float(0).
@@ -149,8 +153,7 @@ def match_template(image, template, area, offset=30, threshold=0.85):
         offset = np.array((-offset[0], -offset[1], offset[0], offset[1]))
     else:
         offset = np.array((0, -offset, 0, offset))
-    image = np.array(image.crop(offset + area))
-    template = np.array(template)
+    image = crop(image, offset + area)
     res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
     _, sim, _, point = cv2.minMaxLoc(res)
     similarity = sim if sim >= threshold else 0.0
@@ -162,24 +165,26 @@ def get_research_series_jp(image):
     Almost the same as get_research_series except the button area.
 
     Args:
-        image (PIL.Image.Image): Screenshot
+        image (np.ndarray): Screenshot
 
     Returns:
         series (string):
     """
     # Set 'prominence = 50' to ignore possible noise.
-    parameters = {'height': 200, 'prominence': 50}
+    parameters = {'height': 160, 'prominence': 50, 'width': 1}
 
     area = SERIES_DETAIL.area
     # Resize is not needed because only one area will be checked in JP server.
-    im = color_similarity_2d(image.crop(area), color=(255, 255, 255))
-    peaks = [len(signal.find_peaks(row, **parameters)[0]) for row in im[2:-2]]
+    im = color_similarity_2d(crop(image, area), color=(255, 255, 255))
+    peaks = [len(signal.find_peaks(row, **parameters)[0]) for row in im[5:-5]]
     upper, lower = max(peaks), min(peaks)
     # print(upper, lower)
     if upper == lower and 1 <= upper <= 3:
         series = upper
     elif upper == 3 and lower == 2:
         series = 4
+    elif upper == 2 and lower == 1:
+        series = 5
     else:
         series = 0
         logger.warning(f'Unknown research series: upper={upper}, lower={lower}')
@@ -190,7 +195,7 @@ def get_research_series_jp(image):
 def get_research_duration_jp(image):
     """
     Args:
-        image (PIL.Image.Image): Screenshot
+        image (np.ndarray): Screenshot
 
     Returns:
         duration (int): number of seconds
@@ -203,7 +208,7 @@ def get_research_duration_jp(image):
 def get_research_genre_jp(image):
     """
     Args:
-        image (PIL.Image.Image): Screenshot
+        image (np.ndarray): Screenshot
 
     Returns:
         genre (string):
@@ -225,9 +230,9 @@ def get_research_cost_jp(image):
     When the research has 2 cost items, the size of each is 77*77.
     However, templates of coins, cubes, and plates differ a lot with each other,
     so simply setting a lower threshold while matching can do the job.
-    
+
     Args:
-        image (PIL.Image.Image): Screenshot
+        image (np.ndarray): Screenshot
 
     Returns:
         costs (string): dict
@@ -238,7 +243,8 @@ def get_research_cost_jp(image):
     templates = load_folder(folder)
     costs = {'coin': False, 'cube': False, 'plate': False}
     for name, template in templates.items():
-        template = load_image(template).resize(size=size_template).crop(area_template)
+        template = load_image(template)
+        template = crop(resize(template, size_template), area_template)
         sim = match_template(image=image,
                              template=template,
                              area=DETAIL_COST.area,
@@ -251,7 +257,7 @@ def get_research_cost_jp(image):
                 costs[cost] = True
                 continue
 
-    # Rename keys to be the same as attrs of ResearchProjectJp.    
+    # Rename keys to be the same as attrs of ResearchProjectJp.
     costs['need_coin'] = costs.pop('coin')
     costs['need_cube'] = costs.pop('cube')
     costs['need_part'] = costs.pop('plate')
@@ -262,9 +268,9 @@ def get_research_ship_jp(image):
     """
     Notice that 2.5, 5, and 8 hours' D research have 4 items, while 0.5 hours' one has 3,
     so the button DETAIL_BLUEPRINT should not cover only the first one of 4 items.
-    
+
     Args:
-        image (PIL.Image.Image): Screenshot
+        image (np.ndarray): Screenshot
 
     Returns:
         ship (string):
@@ -290,8 +296,8 @@ def get_research_ship_jp(image):
 def research_jp_detect(image):
     """
     Args:
-        image (PIL.Image.Image): Screenshot
-            
+        image (np.ndarray): Screenshot
+
     Return:
         project (ResearchProjectJp):
     """
@@ -312,14 +318,31 @@ def research_jp_detect(image):
     return project
 
 
+def research_detect(image):
+    """
+    Args:
+        image (np.ndarray): Screenshot
+
+    Return:
+        list[ResearchProject]:
+    """
+    projects = []
+    for name, series in zip(get_research_name(image), get_research_series(image)):
+        project = ResearchProject(name=name, series=series)
+        logger.attr('Project', project)
+        projects.append(project)
+    return projects
+
+
 class ResearchProject:
     REGEX_SHIP = re.compile(
         '(neptune|monarch|ibuki|izumo|roon|saintlouis'
         '|seattle|georgia|kitakaze|azuma|friedrich'
         '|gascogne|champagne|cheshire|drake|mainz|odin'
-        '|anchorage|hakuryu|agir|august|marcopolo)')
+        '|anchorage|hakuryu|agir|august|marcopolo'
+        '|plymouth|rupprecht|harbin|chkalov|brest)')
     REGEX_INPUT = re.compile('(coin|cube|part)')
-    DR_SHIP = ['azuma', 'friedrich', 'drake', 'hakuryu', 'agir']
+    DR_SHIP = ['azuma', 'friedrich', 'drake', 'hakuryu', 'agir', 'plymouth', 'brest']
 
     def __init__(self, name, series):
         """
@@ -381,6 +404,7 @@ class ResearchProject:
         """
         name = name.strip('-')
         parts = name.split('-')
+        parts = [i for i in parts if i]
         if len(parts) == 3:
             prefix, number, suffix = parts
             number = number.replace('D', '0').replace('O', '0').replace('S', '5')
@@ -409,6 +433,15 @@ class ResearchProject:
             if (data['series'] == series) and (data['name'] == name):
                 yield data
 
+        if len(name) and name[0].isdigit():
+            for t in 'QG':
+                name1 = f'{t}-{self.name}'
+                logger.info(f'Testing the most similar candidate {name1}')
+                for data in LIST_RESEARCH_PROJECT:
+                    if (data['series'] == series) and (data['name'] == name1):
+                        self.name = name1
+                        yield data
+
         if name.startswith('D'):
             # Letter 'C' may recognized as 'D', because project card is shining.
             name1 = 'C' + self.name[1:]
@@ -431,8 +464,9 @@ class ResearchProjectJp:
     SHIP_S2 = ['seattle', 'georgia', 'kitakaze', 'azuma', 'friedrich', 'gascogne']
     SHIP_S3 = ['champagne', 'cheshire', 'drake', 'mainz', 'odin']
     SHIP_S4 = ['anchorage', 'hakuryu', 'agir', 'august', 'marcopolo']
-    SHIP_ALL = SHIP_S1 + SHIP_S2 + SHIP_S3 + SHIP_S4
-    DR_SHIP = ['azuma', 'friedrich', 'drake', 'hakuryu', 'agir']
+    SHIP_S5 = ['plymouth', 'rupprecht', 'harbin', 'chkalov', 'brest']
+    SHIP_ALL = SHIP_S1 + SHIP_S2 + SHIP_S3 + SHIP_S4 + SHIP_S5
+    DR_SHIP = ['azuma', 'friedrich', 'drake', 'hakuryu', 'agir', 'plymouth', 'brest']
 
     def __init__(self):
         self.valid = True
@@ -511,13 +545,13 @@ class ResearchSelector(UI):
                 break
 
     @Config.when(SERVER='jp')
-    def research_detect(self, image):
+    def research_detect(self):
         """
         We do not need a screenshot here actually. 'image' is a null argument.
         Adding this argument is just to eusure all "research_detect" have the same arguments.
 
         Args:
-            image (PIL.Image.Image): Screenshots
+            image (np.ndarray): Screenshots
         """
         projects = []
         proj_sorted = []
@@ -538,7 +572,7 @@ class ResearchSelector(UI):
             self.research_detail_quit()
         """
         page_research should remain the same as before.
-        Since we entered the 4th entrance first, 
+        Since we entered the 4th entrance first,
         the indexes from left to right are (2, 3, 4, 0, 1).
         """
         for pos in range(5):
@@ -547,20 +581,32 @@ class ResearchSelector(UI):
         self.projects = proj_sorted
 
     @Config.when(SERVER=None)
-    def research_detect(self, image):
+    def research_detect(self):
         """
         Args:
-            image (PIL.Image.Image): Screenshots
+            image (np.ndarray): Screenshots
         """
-        projects = []
-        for name, series in zip(get_research_name(image), get_research_series(image)):
-            project = ResearchProject(name=name, series=series)
-            logger.attr('Project', project)
-            projects.append(project)
+        timeout = Timer(3, count=3).start()
+        while 1:
+            projects = research_detect(self.device.image)
+
+            if timeout.reached():
+                break
+
+            if sum([p.valid for p in projects]) == 4 and not projects[0].valid:
+                # Leftmost research series covered by battle pass info, see #1037
+                logger.info('Wrong research serial on the leftmost project, '
+                            'probably because of battle pass info')
+                # A rare case, poor sleep is acceptable
+                self.device.sleep(1)
+                self.device.screenshot()
+                continue
+            else:
+                break
 
         self.projects = projects
 
-    def research_sort_filter(self):
+    def research_sort_filter(self, enforce=False):
         """
         Returns:
             list: A list of ResearchProject objects and preset strings,
@@ -571,35 +617,61 @@ class ResearchSelector(UI):
         if preset == 'custom':
             string = self.config.Research_CustomFilter
         else:
+            if self.config.Research_UseCube == 'always_use' or enforce:
+                if f'{preset}_cube' in DICT_FILTER_PRESET:
+                    preset = f'{preset}_cube'
             if preset not in DICT_FILTER_PRESET:
                 logger.warning(f'Preset not found: {preset}, use default preset')
-                preset = 'series_4'
+                preset = 'series_5_blueprint_152'
             string = DICT_FILTER_PRESET[preset]
+
+        logger.attr('Research preset', preset)
 
         # Filter uses `hakuryu`, but allows both `hakuryu` and `hakuryuu`
         string = string.lower().replace('hakuryuu', 'hakuryu')
 
         FILTER.load(string)
-        priority = FILTER.apply(self.projects, func=self._research_check)
+        priority = FILTER.apply(self.projects, func=partial(self._research_check, enforce=enforce))
 
         # Log
         logger.attr('Filter_sort', ' > '.join([str(project) for project in priority]))
         return priority
 
-    def _research_check(self, project):
+    def _research_check(self, project, enforce=False):
         """
         Args:
             project (ResearchProject):
-
+            enforce (Bool):
         Returns:
             bool:
         """
         if not project.valid:
             return False
-        if (not self.config.Research_UseCube and project.need_cube) \
-                or (not self.config.Research_UseCoin and project.need_coin) \
-                or (not self.config.Research_UsePart and project.need_part):
-            return False
+
+        # Check project consumption
+        is_05 = str(project.duration) == '0.5'
+        if project.need_cube:
+            if self.config.Research_UseCube == 'do_not_use':
+                return False
+            if self.config.Research_UseCube == 'only_no_project' and not enforce:
+                return False
+            if self.config.Research_UseCube == 'only_05_hour' and not is_05 and not enforce:
+                return False
+        if project.need_coin:
+            if self.config.Research_UseCoin == 'do_not_use':
+                return False
+            if self.config.Research_UseCoin == 'only_no_project' and not enforce:
+                return False
+            if self.config.Research_UseCoin == 'only_05_hour' and not is_05 and not enforce:
+                return False
+        if project.need_part:
+            if self.config.Research_UsePart == 'do_not_use':
+                return False
+            if self.config.Research_UsePart == 'only_no_project' and not enforce:
+                return False
+            if self.config.Research_UsePart == 'only_05_hour' and not is_05 and not enforce:
+                return False
+
         # Reasons to ignore B series and E-2:
         # - Can't guarantee research condition satisfied.
         #   You may get nothing after a day of running, because you didn't complete the precondition.
@@ -609,6 +681,8 @@ class ResearchSelector(UI):
         if project.genre.upper() == 'B':
             return False
         # T series require commission
+        # 2022.05.08 Allow T series researches because commission is now force to enable
+        # 2022.07.17 Disallow T again cause they can't be queued unless pre-conditions satisfied
         if project.genre.upper() == 'T':
             return False
         # 2021.08.19 Allow E-2 to disassemble tech boxes, but JP still remains the same.
@@ -621,26 +695,26 @@ class ResearchSelector(UI):
 
         return True
 
-    def research_sort_shortest(self):
+    def research_sort_shortest(self, enforce):
         """
         Returns:
             list: A list of ResearchProject objects and preset strings,
                 such as [object, object, object, 'reset']
         """
         FILTER.load(FILTER_STRING_SHORTEST)
-        priority = FILTER.apply(self.projects, func=self._research_check)
+        priority = FILTER.apply(self.projects, func=partial(self._research_check, enforce=enforce))
 
         logger.attr('Filter_sort', ' > '.join([str(project) for project in priority]))
         return priority
 
-    def research_sort_cheapest(self):
+    def research_sort_cheapest(self, enforce):
         """
         Returns:
             list: A list of ResearchProject objects and preset strings,
                 such as [object, object, object, 'reset']
         """
         FILTER.load(FILTER_STRING_CHEAPEST)
-        priority = FILTER.apply(self.projects, func=self._research_check)
+        priority = FILTER.apply(self.projects, func=partial(self._research_check, enforce=enforce))
 
         logger.attr('Filter_sort', ' > '.join([str(project) for project in priority]))
         return priority

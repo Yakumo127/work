@@ -24,23 +24,29 @@ def merge_get_items(item_list_1, item_list_2):
 
 
 class GetItemsStatistics:
+    def appear_on(self, image):
+        return GET_ITEMS_1.match(image, offset=(20, 20)) or GET_ITEMS_2.match(image, offset=(20, 20))
+
     @staticmethod
     def _stats_get_items_is_odd(image):
         """
         Args:
-            image: Pillow image
+            image (np.ndarray):
 
         Returns:
             bool: If the number of items in row is odd.
         """
-        image = np.array(image.crop(GET_ITEMS_ODD.area))
+        image = crop(image, GET_ITEMS_ODD.area)
         return np.mean(rgb2gray(image) > 127) > 0.1
 
     def _stats_get_items_load(self, image):
         """
         Args:
-            image: Pillow image, 1280x720.
+            image (np.ndarray):
         """
+        ITEM_GROUP.item_class = Item
+        ITEM_GROUP.similarity = 0.92
+        ITEM_GROUP.amount_area = (60, 71, 91, 92)
         ITEM_GROUP.grids = None
         if INFO_BAR_1.appear_on(image):
             raise ImageError('Stat image has info_bar')
@@ -56,7 +62,7 @@ class GetItemsStatistics:
     def stats_get_items(self, image, **kwargs):
         """
         Args:
-            image: Pillow image.
+            image (np.ndarray):
 
         Returns:
             list[Item]:
@@ -79,11 +85,11 @@ class GetItemsStatistics:
     def extract_template(self, image, folder):
         """
         Args:
-            image: Pillow image.
+            image:
             folder: Folder to save new templates.
         """
         self._stats_get_items_load(image)
         if ITEM_GROUP.grids is not None:
             new = ITEM_GROUP.extract_template(image)
             for name, im in new.items():
-                im.save(os.path.join(folder, f'{name}.png'))
+                cv2.imwrite(os.path.join(folder, f'{name}.png'), im)

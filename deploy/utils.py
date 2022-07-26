@@ -2,7 +2,7 @@ import os
 import re
 
 DEPLOY_CONFIG = './config/deploy.yaml'
-DEPLOY_TEMPLATE = './deploy/template/deploy.yaml'
+DEPLOY_TEMPLATE = './deploy/template'
 
 
 class cached_property:
@@ -49,6 +49,14 @@ def poor_yaml_read(file):
             if result:
                 k, v = result.group(1), result.group(2).strip('\n\r\t\' ')
                 if v:
+                    if v.lower() == 'null':
+                        v = None
+                    elif v.lower() == 'false':
+                        v = False
+                    elif v.lower() == 'true':
+                        v = True
+                    elif v.isdigit():
+                        v = int(v)
                     data[k] = v
 
     return data
@@ -65,19 +73,13 @@ def poor_yaml_write(data, file, template_file=DEPLOY_TEMPLATE):
         text = f.read().replace('\\', '/')
 
     for key, value in data.items():
+        if value is None:
+            value = 'null'
+        elif value is True:
+            value = "true"
+        elif value is False:
+            value = "false"
         text = re.sub(f'{key}:.*?\n', f'{key}: {value}\n', text)
 
-    with open(file, 'w', encoding='utf-8') as f:
+    with open(file, 'w', encoding='utf-8', newline='') as f:
         f.write(text)
-
-
-def hr1(title):
-    print('=' * 20 + ' ' + title + ' ' + '=' * 20)
-
-
-def hr0(title):
-    middle = '|' + ' ' * 20 + title + ' ' * 20 + '|'
-    border = '+' + '-' * (len(middle) - 2) + '+'
-    print(border)
-    print(middle)
-    print(border)

@@ -4,11 +4,11 @@ from module.combat.level import LevelOcr
 from module.equipment.assets import *
 from module.equipment.equipment_change import EquipmentChange
 from module.equipment.fleet_equipment import OCR_FLEET_INDEX
+from module.exception import CampaignEnd
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
 from module.ocr.ocr import Digit
 from module.retire.dock import *
-from module.ui.page import page_fleet, page_main
-from module.exception import CampaignEnd
+from module.ui.page import page_fleet
 
 SIM_VALUE = 0.95
 
@@ -60,7 +60,7 @@ class GemsFarming(CampaignRun, Dock, EquipmentChange):
         """
         Enter GEMS_FLEET_1 page
         """
-        self.ui_ensure(page_fleet)
+        self.ui_goto(page_fleet)
         self.ui_ensure_index(self.config.Fleet_Fleet1, letter=OCR_FLEET_INDEX,
                              next_button=FLEET_NEXT, prev_button=FLEET_PREV, skip_first_screenshot=True)
 
@@ -70,7 +70,7 @@ class GemsFarming(CampaignRun, Dock, EquipmentChange):
 
     def flagship_change(self):
         """
-        Change flagship and flagship's equipment 
+        Change flagship and flagship's equipment
         If config.GemsFarming_CommonCV == 'any', only change auxiliary equipment
         """
 
@@ -96,11 +96,9 @@ class GemsFarming(CampaignRun, Dock, EquipmentChange):
 
             self.equipment_take_on(index_list=index_list)
 
-        self.ui_ensure(page_main)
-
     def vanguard_change(self):
         """
-        Change vanguard and vanguard's equipment 
+        Change vanguard and vanguard's equipment
         """
         logger.hr('CHANGING VANGUARD.')
         if self.config.GemsFarming_VanguardEquipChange:
@@ -119,7 +117,6 @@ class GemsFarming(CampaignRun, Dock, EquipmentChange):
             self._equip_take_off_one()
 
             self.equipment_take_on()
-        self.ui_ensure(page_main)
 
     def _ship_change_confirm(self, button):
 
@@ -162,7 +159,7 @@ class GemsFarming(CampaignRun, Dock, EquipmentChange):
             list_level = ocr.ocr(self.device.image)
 
             for button, level in zip(card_grids.buttons, list_level):
-                if level == 1 and template.match(self.device.image.crop(button.area), similarity=SIM_VALUE):
+                if level == 1 and template.match(self.image_crop(button), similarity=SIM_VALUE):
                     return button
 
             logger.info('No specific CV was found, try reversed order.')
@@ -171,7 +168,7 @@ class GemsFarming(CampaignRun, Dock, EquipmentChange):
             list_level = ocr.ocr(self.device.image)
 
             for button, level in zip(card_grids.buttons, list_level):
-                if level == 1 and template.match(self.device.image.crop(button.area), similarity=SIM_VALUE):
+                if level == 1 and template.match(self.image_crop(button), similarity=SIM_VALUE):
                     return button
 
             return None
@@ -267,7 +264,7 @@ class GemsFarming(CampaignRun, Dock, EquipmentChange):
             logger.hr('TRIGGERED LV32 LIMIT')
             return True
 
-        if self.config.Campaign_UseAutoSearch and self.campaign.config.GEMS_EMOTION_TRIGGRED:
+        if self.campaign.map_is_auto_search and self.campaign.config.GEMS_EMOTION_TRIGGRED:
             self._trigger_emotion = True
             logger.hr('TRIGGERED EMOTION LIMIT')
             return True
@@ -307,6 +304,12 @@ class GemsFarming(CampaignRun, Dock, EquipmentChange):
                 self._trigger_emotion = False
                 self.campaign.config.LV32_TRIGGERED = False
                 self.campaign.config.GEMS_EMOTION_TRIGGRED = False
+
+                # Scheduler
+                if self.config.task_switched():
+                    self.campaign.ensure_auto_search_exit()
+                    self.config.task_stop()
+
                 continue
             else:
                 break

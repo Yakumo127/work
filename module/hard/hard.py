@@ -21,7 +21,7 @@ class CampaignHard(CampaignRun):
             Campaign_Mode='hard',
             Campaign_UseFleetLock=True,
             Campaign_UseAutoSearch=True,
-            Fleet_AutoSearchFleetOrder='fleet1_all_fleet2_standby' if self.config.Hard_HardFleet == 1 else 'fleet1_standby_fleet2_all',
+            Fleet_FleetOrder='fleet1_all_fleet2_standby' if self.config.Hard_HardFleet == 1 else 'fleet1_standby_fleet2_all',
             Emotion_CalculateEmotion=False,
         )
         # Equipment take on
@@ -51,3 +51,4 @@ class CampaignHard(CampaignRun):
 
         # Scheduler
         self.config.task_delay(server_update=True)
+        self.config.task_call('Reward')

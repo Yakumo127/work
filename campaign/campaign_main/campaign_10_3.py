@@ -1,7 +1,7 @@
 from module.campaign.campaign_base import CampaignBase
-from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
 from module.logger import logger
+from module.map.map_base import CampaignMap
+from module.map.map_grids import RoadGrids, SelectedGrids
 
 MAP = CampaignMap('10-3')
 MAP.shape = 'I6'
@@ -60,6 +60,7 @@ class Config:
         'width': (0, 10),
         'wlen': 1000,
     }
+    HOMO_EDGE_HOUGHLINES_THRESHOLD = 210
 
 
 class Campaign(CampaignBase):

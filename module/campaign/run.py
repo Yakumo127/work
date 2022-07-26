@@ -4,10 +4,9 @@ import os
 
 from module.campaign.assets import *
 from module.campaign.campaign_base import CampaignBase
-from module.combat.auto_search_combat import AutoSearchCombat
 from module.config.config import AzurLaneConfig
-from module.config.utils import deep_get
-from module.exception import RequestHumanTakeover, ScriptEnd
+from module.exception import CampaignEnd, RequestHumanTakeover, ScriptEnd
+from module.handler.fast_forward import map_files
 from module.logger import logger
 from module.ocr.ocr import Digit
 from module.ui.ui import UI
@@ -49,15 +48,14 @@ class CampaignRun(UI):
             self.module = importlib.import_module('.' + name, f'campaign.{folder}')
         except ModuleNotFoundError:
             logger.warning(f'Map file not found: campaign.{folder}.{name}')
-            folder = f'./campaign/{folder}'
-            if not os.path.exists(folder):
-                logger.warning(f'Folder not exists: {folder}')
+            if not os.path.exists(f'./campaign/{folder}'):
+                logger.warning(f'Folder not exists: ./campaign/{folder}')
             else:
-                files = [f[:-3] for f in os.listdir(folder) if f[-3:] == '.py']
+                files = map_files(folder)
                 logger.warning(f'Existing files: {files}')
 
-            logger.critical(f'Possible reason: This event ({folder}) does not have {name}')
-            logger.critical(f'Possible reason: You are using an old Alas, '
+            logger.critical(f'Possible reason #1: This event ({folder}) does not have {name}')
+            logger.critical(f'Possible reason #2: You are using an old Alas, '
                             'please check for update, or make map files yourself using dev_tools/map_extractor.py')
             raise RequestHumanTakeover
 
@@ -99,6 +97,11 @@ class CampaignRun(UI):
             logger.hr('Triggered stop condition: Get new ship')
             self.config.Scheduler_Enable = False
             return True
+        # Event limit
+        if oil_check and self.campaign.event_pt_limit_triggered():
+            logger.hr('Triggered stop condition: Event PT limit')
+            self.config.Scheduler_Enable = False
+            return True
 
         return False
 
@@ -135,15 +138,44 @@ class CampaignRun(UI):
         Returns:
             str, str: name, folder
         """
-        name = name.lower()
+        name = str(name).lower()
         if name[0].isdigit():
             name = 'campaign_' + name.lower().replace('-', '_')
         if folder == 'event_20201126_cn' and name == 'vsp':
             name = 'sp'
         if folder == 'event_20210723_cn' and name == 'vsp':
             name = 'sp'
+        if folder == 'event_20220324_cn' and name == 'esp':
+            name = 'sp'
+        convert = {
+            'a1': 't1',
+            'a2': 't2',
+            'a3': 't3',
+            'b1': 't4',
+            'b2': 't5',
+            'b3': 't6',
+            'c1': 'ht1',
+            'c2': 'ht2',
+            'c3': 'ht3',
+            'd1': 'ht4',
+            'd2': 'ht5',
+            'd3': 'ht6',
+        }
+        if folder == 'event_20200917_cn':
+            name = convert.get(name, name)
+        else:
+            reverse = {v: k for k, v in convert.items()}
+            name = reverse.get(name, name)
 
         return name, folder
+
+    def can_use_auto_search_continue(self):
+        # Cannot update map info in auto search menu
+        # Close it if map achievement is set
+        if self.config.StopCondition_MapAchievement != 'non_stop':
+            return False
+
+        return self.run_count > 0 and self.campaign.map_is_auto_search
 
     def handle_commission_notice(self):
         """
@@ -156,11 +188,10 @@ class CampaignRun(UI):
         Pages:
             in: page_campaign
         """
-        if deep_get(self.config.data, keys='Commission.Scheduler.Enable', default=False):
-            if self.campaign.commission_notice_show_at_campaign():
-                logger.info('Commission notice found')
-                self.config.task_call('Commission')
-                self.config.task_stop('Commission notice found')
+        if self.campaign.commission_notice_show_at_campaign():
+            logger.info('Commission notice found')
+            self.config.task_call('Commission', force_call=True)
+            self.config.task_stop('Commission notice found')
 
     def run(self, name, folder='campaign_main', mode='normal', total=0):
         """
@@ -178,6 +209,8 @@ class CampaignRun(UI):
             # End
             if total and self.run_count >= total:
                 break
+            if self.campaign.event_time_limit_triggered():
+                self.config.task_stop()
 
             # Log
             logger.hr(name, level=1)
@@ -187,18 +220,26 @@ class CampaignRun(UI):
                 logger.info(f'Count: {self.run_count}')
 
             # UI ensure
-            self.device.screenshot()
+            self.device.click_record_clear()
+            if not hasattr(self.device, 'image') or self.device.image is None:
+                self.device.screenshot()
             self.campaign.device.image = self.device.image
             if self.campaign.is_in_map():
-                logger.info('Already in map, skip ensure_campaign_ui.')
+                logger.info('Already in map, retreating.')
+                try:
+                    self.campaign.withdraw()
+                except CampaignEnd:
+                    pass
+                self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
             elif self.campaign.is_in_auto_search_menu():
-                logger.info('In auto search menu, skip ensure_campaign_ui.')
+                if self.can_use_auto_search_continue():
+                    logger.info('In auto search menu, skip ensure_campaign_ui.')
+                else:
+                    logger.info('In auto search menu, closing.')
+                    self.campaign.ensure_auto_search_exit()
+                    self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
             else:
-                self.ui_get_current_page()
-                self.campaign.ensure_campaign_ui(
-                    name=self.stage,
-                    mode=mode
-                )
+                self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
             self.handle_commission_notice()
 
             # End
@@ -224,6 +265,7 @@ class CampaignRun(UI):
             if self.campaign.config.MAP_IS_ONE_TIME_STAGE:
                 if self.run_count >= 1:
                     logger.hr('Triggered one-time stage limit')
+                    self.campaign.handle_map_stop()
                     break
             # Scheduler
             if self.config.task_switched():

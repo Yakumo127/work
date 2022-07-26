@@ -44,7 +44,7 @@ class Scroll:
         Returns:
             np.ndarray: Shape (n,), dtype bool.
         """
-        image = np.array(main.image_area(self.area))
+        image = main.image_crop(self.area)
         image = color_similarity_2d(image, color=self.color)
         mask = np.max(image, axis=1 if self.is_vertical else 0) > self.color_threshold
         self.length = np.sum(mask)
@@ -64,7 +64,7 @@ class Scroll:
         position = (middle - self.length / 2) / (self.total - self.length)
         position = position if position > 0 else 0.0
         position = position if position < 1 else 1.0
-        logger.attr(self.name, f'{position:.2f}')
+        logger.attr(self.name, f'{position:.2f} ({middle}-{self.length / 2})/({self.total}-{self.length})')
         return position
 
     def position_to_screen(self, position, random_range=(-0.05, 0.05)):
@@ -106,7 +106,7 @@ class Scroll:
     def at_bottom(self, main):
         return self.cal_position(main) > 0.95
 
-    def set(self, position, main, random_range=(-0.05, 0.05), skip_first_screenshot=True):
+    def set(self, position, main, random_range=(-0.05, 0.05), distance_check=True, skip_first_screenshot=True):
         """
         Set scroll to a specific position.
 
@@ -114,6 +114,7 @@ class Scroll:
             position (float, int): 0 to 1.
             main (ModuleBase):
             random_range (tuple(int, float)):
+            distance_check (bool): Whether to drop short swipes
             skip_first_screenshot:
         """
         logger.info(f'{self.name} set to {position}')
@@ -132,11 +133,14 @@ class Scroll:
             current = self.cal_position(main)
             if abs(position - current) < self.drag_threshold:
                 break
+            if not self.length:
+                logger.warning('Scroll disappeared, assume scroll set')
+                break
 
             if self.drag_interval.reached():
                 p1 = random_rectangle_point(self.position_to_screen(current), n=1)
                 p2 = random_rectangle_point(self.position_to_screen(position, random_range=random_range), n=1)
-                main.device.drag(p1, p2, shake=(0, 0), point_random=(0, 0, 0, 0), shake_random=(0, 0, 0, 0))
+                main.device.swipe(p1, p2, name=self.name, distance_check=distance_check)
                 main.device.sleep(0.3)
                 self.drag_interval.reset()
 
@@ -162,11 +166,11 @@ class Scroll:
 
         multiply = self.length / (self.total - self.length)
         target = current + page * multiply
-        target = min(max(target, 0), 1)
+        target = round(min(max(target, 0), 1), 3)
         self.set(target, main=main, random_range=random_range, skip_first_screenshot=True)
 
-    def next_page(self, main, random_range=(-0.01, 0.01), skip_first_screenshot=True):
-        self.drag_page(0.8, main=main, random_range=random_range, skip_first_screenshot=skip_first_screenshot)
+    def next_page(self, main, page=0.8, random_range=(-0.01, 0.01), skip_first_screenshot=True):
+        self.drag_page(page, main=main, random_range=random_range, skip_first_screenshot=skip_first_screenshot)
 
-    def prev_page(self, main, random_range=(-0.01, 0.01), skip_first_screenshot=True):
-        self.drag_page(-0.8, main=main, random_range=random_range, skip_first_screenshot=skip_first_screenshot)
+    def prev_page(self, main, page=0.8, random_range=(-0.01, 0.01), skip_first_screenshot=True):
+        self.drag_page(-page, main=main, random_range=random_range, skip_first_screenshot=skip_first_screenshot)

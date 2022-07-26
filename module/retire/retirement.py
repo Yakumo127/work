@@ -1,6 +1,6 @@
 from module.base.button import ButtonGrid
 from module.base.timer import Timer
-from module.base.utils import get_color, color_similar
+from module.base.utils import color_similar, get_color, resize
 from module.combat.assets import GET_ITEMS_1
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
@@ -23,7 +23,7 @@ CARD_RARITY_COLORS = {
 
 class Retirement(Enhancement):
     _unable_to_enhance = False
-    _have_keeped_cv = True
+    _have_kept_cv = True
 
     def _retirement_choose(self, amount=10, target_rarity=('N',)):
         """
@@ -47,7 +47,8 @@ class Retirement(Enhancement):
                     f = True
 
             if not f:
-                logger.warning(f'Unknown rarity color. Grid: ({x}, {y}). Color: {card_color}')
+                logger.warning(
+                    f'Unknown rarity color. Grid: ({x}, {y}). Color: {card_color}')
 
         logger.info(' '.join([r.rjust(3) for r in rarity[:7]]))
         logger.info(' '.join([r.rjust(3) for r in rarity[7:]]))
@@ -80,10 +81,18 @@ class Retirement(Enhancement):
             else:
                 self.device.screenshot()
 
-            if self.appear_then_click(SHIP_CONFIRM, offset=(30, 30), interval=2):
+            # End
+            if executed and self.appear(IN_RETIREMENT_CHECK):
+                self.handle_info_bar()
+                break
+
+            # Click
+            if self.appear(SHIP_CONFIRM, offset=(30, 30), interval=2) \
+                    and SHIP_CONFIRM.match_appear_on(self.device.image):
+                self.device.click(SHIP_CONFIRM)
                 continue
             if self.appear(SHIP_CONFIRM_2, offset=(30, 30), interval=2):
-                if self.config.RETIRE_KEEP_COMMON_CV and not self._have_keeped_cv:
+                if self.config.RETIRE_KEEP_COMMON_CV and not self._have_kept_cv:
                     self.keep_one_common_cv()
                 self.device.click(SHIP_CONFIRM_2)
                 self.interval_clear(GET_ITEMS_1)
@@ -98,30 +107,27 @@ class Retirement(Enhancement):
                 self.device.click(GET_ITEMS_1_RETIREMENT_SAVE)
                 self.interval_reset(SHIP_CONFIRM)
                 continue
-            if self.config.Retirement_OldRetireSR \
+            if self._unable_to_enhance \
+                    or self.config.Retirement_OldRetireSR \
                     or self.config.Retirement_OldRetireSSR \
                     or self.config.Retirement_RetireMode == 'one_click_retire':
                 if self.handle_popup_confirm('RETIRE_SR_SSR'):
                     continue
-                if self.config.SERVER == 'jp' and \
+                if self.config.SERVER in ['cn', 'jp', 'tw'] and \
                         self.appear_then_click(SR_SSR_CONFIRM, offset=self._popup_offset, interval=2):
                     continue
-
-            # End
-            if executed and self.appear(IN_RETIREMENT_CHECK):
-                self.handle_info_bar()
-                break
 
         self._popup_offset = backup
 
     def retirement_appear(self):
         return self.appear(RETIRE_APPEAR_1, offset=30) \
-               and self.appear(RETIRE_APPEAR_2, offset=30) \
-               and self.appear(RETIRE_APPEAR_3, offset=30)
+            and self.appear(RETIRE_APPEAR_2, offset=30) \
+            and self.appear(RETIRE_APPEAR_3, offset=30)
 
     def _retirement_quit(self):
         def check_func():
-            return not self.appear(IN_RETIREMENT_CHECK)
+            return not self.appear(IN_RETIREMENT_CHECK, offset=(20, 20)) \
+                and not self.appear(DOCK_CHECK, offset=(20, 20))
 
         self.ui_back(check_button=check_func, skip_first_screenshot=True)
 
@@ -148,7 +154,7 @@ class Retirement(Enhancement):
         total = 0
 
         if self.config.RETIRE_KEEP_COMMON_CV:
-            self._have_keeped_cv = False
+            self._have_kept_cv = False
 
         while 1:
             self.handle_info_bar()
@@ -195,18 +201,34 @@ class Retirement(Enhancement):
             rarity = self._retire_rarity
         logger.hr('Retirement')
         logger.info(f'Amount={amount}. Rarity={rarity}')
+
+        # transfer N R SR SSR to filter name
+        correspond_name = {
+            'N': 'common',
+            'R': 'rare',
+            'SR': 'elite',
+            'SSR': 'super_rare'
+        }
+        _rarity = [correspond_name[i] for i in rarity]
+        self.dock_filter_set(sort='level', index='all',
+                             faction='all', rarity=_rarity, extra='no_limit')
         self.dock_sort_method_dsc_set(False)
         self.dock_favourite_set(False)
         total = 0
 
         if self.config.RETIRE_KEEP_COMMON_CV:
-            self._have_keeped_cv = False
+            self._have_kept_cv = False
 
         while amount:
-            selected = self._retirement_choose(amount=10 if amount > 10 else amount, target_rarity=rarity)
+            selected = self._retirement_choose(
+                amount=10 if amount > 10 else amount, target_rarity=rarity)
             total += selected
             if selected == 0:
                 break
+            self.device.screenshot()
+            if not (self.appear(SHIP_CONFIRM, offset=(30, 30)) and SHIP_CONFIRM.match_appear_on(self.device.image)):
+                logger.warning('No ship selected, retrying')
+                continue
 
             self._retirement_confirm()
 
@@ -218,27 +240,55 @@ class Retirement(Enhancement):
             continue
 
         self.dock_sort_method_dsc_set(True)
+        self.dock_filter_set()
         logger.info(f'Total retired: {total}')
         return total
 
     def handle_retirement(self):
+        """
+        Returns:
+            bool: If retired.
+        """
         if not self.config.Retirement_Enable:
-            return False
-        if not self.retirement_appear():
             return False
 
         if self._unable_to_enhance:
-            self._retire_handler(mode='one_click_retire')
+            if self.appear_then_click(RETIRE_APPEAR_1, offset=(20, 20), interval=3):
+                self.interval_clear(IN_RETIREMENT_CHECK)
+                return False
+            if self.appear(IN_RETIREMENT_CHECK, offset=(20, 20), interval=10):
+                self._retire_handler(mode='one_click_retire')
+                self._unable_to_enhance = False
+                self.interval_reset(IN_RETIREMENT_CHECK)
+                return True
         elif self.config.Retirement_RetireMode == 'enhance':
-            total = self._enhance_handler()
-            if not total:
-                logger.info('No ship to enhance, but dock full, will try retire')
-                self._unable_to_enhance = True
+            if self.appear_then_click(RETIRE_APPEAR_3, offset=(20, 20), interval=3):
+                self.interval_clear(DOCK_CHECK)
+                return False
+            if self.appear(DOCK_CHECK, offset=(20, 20), interval=10):
+                self.handle_dock_cards_loading()
+                total, remain = self._enhance_handler()
+                if not total:
+                    logger.info(
+                        'No ship to enhance, but dock full, will try retire')
+                    self._unable_to_enhance = True
+                logger.info(f'The remaining spare dock amount is {remain}')
+                if remain < 3:
+                    logger.info('Too few spare docks, retire next time')
+                    self._unable_to_enhance = True
+                self.interval_reset(DOCK_CHECK)
+                return True
         else:
-            self._retire_handler()
-            self._unable_to_enhance = False
+            if self.appear_then_click(RETIRE_APPEAR_1, offset=(20, 20), interval=3):
+                self.interval_clear(IN_RETIREMENT_CHECK)
+                return False
+            if self.appear(IN_RETIREMENT_CHECK, offset=(20, 20), interval=10):
+                self._retire_handler()
+                self._unable_to_enhance = False
+                self.interval_reset(IN_RETIREMENT_CHECK)
+                return True
 
-        return True
+        return False
 
     def _retire_handler(self, mode=None):
         """
@@ -247,15 +297,19 @@ class Retirement(Enhancement):
 
         Returns:
             int: Amount of retired ships
+
+        Pages:
+            in: IN_RETIREMENT_CHECK
+            out: the page before retirement popup
         """
         if mode is None:
             mode = self.config.Retirement_RetireMode
-        self.ui_click(RETIRE_APPEAR_1, check_button=IN_RETIREMENT_CHECK, skip_first_screenshot=True)
 
         if mode == 'one_click_retire':
             total = self.retire_ships_one_click()
             if not total:
-                logger.warning('No ship retired, trying to reset dock filter and disable favourite, then retire again')
+                logger.warning(
+                    'No ship retired, trying to reset dock filter and disable favourite, then retire again')
                 self.dock_filter_set()
                 self.dock_favourite_set(False)
                 total = self.retire_ships_one_click()
@@ -273,7 +327,8 @@ class Retirement(Enhancement):
                                 'make sure it can select ships to retire')
                 raise RequestHumanTakeover
         else:
-            raise ScriptError(f'Unknown retire mode: {self.config.Retirement_RetireMode}')
+            raise ScriptError(
+                f'Unknown retire mode: {self.config.Retirement_RetireMode}')
 
         self._retirement_quit()
         self.config.DOCK_FULL_TRIGGERED = True
@@ -309,20 +364,23 @@ class Retirement(Enhancement):
             Button:
         """
         if self.config.GemsFarming_CommonCV == 'any':
-            for commen_cv_name in ['BOGUE', 'HERMES', 'LANGLEY', 'RANGER']:
-                template = globals()[f'TEMPLATE_{commen_cv_name}']
-                sim, button = template.match_result(self.device.image.resize(size=(1189, 669)))
+            for common_cv_name in ['BOGUE', 'HERMES', 'LANGLEY', 'RANGER']:
+                template = globals()[f'TEMPLATE_{common_cv_name}']
+                sim, button = template.match_result(
+                    resize(self.device.image, size=(1189, 669)))
 
                 if sim > self.config.COMMON_CV_THRESHOLD:
                     return Button(button=tuple(_ * 155 // 144 for _ in button.button), area=button.area,
                                   color=button.color,
-                                  name=f'TEMPLATE_{commen_cv_name}_RETIRE')
+                                  name=f'TEMPLATE_{common_cv_name}_RETIRE')
 
                 return None
         else:
 
-            template = globals()[f'TEMPLATE_{self.config.GemsFarming_CommonCV.upper()}']
-            sim, button = template.match_result(self.device.image.resize(size=(1189, 669)))
+            template = globals()[
+                f'TEMPLATE_{self.config.GemsFarming_CommonCV.upper()}']
+            sim, button = template.match_result(
+                resize(self.device.image, size=(1189, 669)))
 
             if sim > self.config.COMMON_CV_THRESHOLD:
                 return Button(button=tuple(_ * 155 // 144 for _ in button.button), area=button.area, color=button.color,
@@ -334,4 +392,4 @@ class Retirement(Enhancement):
         button = self.retirement_get_common_rarity_cv()
         if button is not None:
             self._retire_select_one(button, skip_first_screenshot=False)
-            self._have_keeped_cv = True
+            self._have_kept_cv = True

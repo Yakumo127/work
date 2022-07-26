@@ -49,33 +49,41 @@ class InfoHandler(ModuleBase):
         else:
             return False
 
-    def ensure_no_info_bar(self, timeout=0.6):
-        timeout = Timer(timeout)
-        timeout.start()
+    def ensure_no_info_bar(self, timeout=0.6, skip_first_screenshot=True):
+        timeout = Timer(timeout).start()
+        handled = False
         while 1:
-            self.device.screenshot()
-            self.handle_info_bar()
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
 
+            if self.handle_info_bar():
+                handled = True
+
+            # End
             if timeout.reached():
                 break
+
+        return handled
 
     """
     Popup info
     """
     _popup_offset = (3, 30)
 
-    def handle_popup_confirm(self, name=''):
+    def handle_popup_confirm(self, name='', interval=2):
         if self.appear(POPUP_CANCEL, offset=self._popup_offset) \
-                and self.appear(POPUP_CONFIRM, offset=self._popup_offset, interval=2):
+                and self.appear(POPUP_CONFIRM, offset=self._popup_offset, interval=interval):
             POPUP_CONFIRM.name = POPUP_CONFIRM.name + '_' + name
             self.device.click(POPUP_CONFIRM)
             POPUP_CONFIRM.name = POPUP_CONFIRM.name[:-len(name) - 1]
             return True
         return False
 
-    def handle_popup_cancel(self, name=''):
+    def handle_popup_cancel(self, name='', interval=2):
         if self.appear(POPUP_CONFIRM, offset=self._popup_offset) \
-                and self.appear(POPUP_CANCEL, offset=self._popup_offset, interval=2):
+                and self.appear(POPUP_CANCEL, offset=self._popup_offset, interval=interval):
             POPUP_CANCEL.name = POPUP_CANCEL.name + '_' + name
             self.device.click(POPUP_CANCEL)
             POPUP_CANCEL.name = POPUP_CANCEL.name[:-len(name) - 1]
@@ -91,6 +99,9 @@ class InfoHandler(ModuleBase):
             return True
 
         return False
+
+    def popup_interval_clear(self):
+        self.interval_clear([POPUP_CANCEL, POPUP_CONFIRM])
 
     def handle_urgent_commission(self, drop=None):
         """
@@ -199,7 +210,7 @@ class InfoHandler(ModuleBase):
     """
     Story
     """
-    story_popup_timout = Timer(10, count=20)
+    story_popup_timeout = Timer(10, count=20)
     map_has_clear_mode = False  # Will be override in fast_forward.py
 
     # Area to detect the options, should include at least 3 options.
@@ -207,13 +218,15 @@ class InfoHandler(ModuleBase):
     # Background color of the left part of the option.
     _story_option_color = (99, 121, 156)
     _story_option_timer = Timer(2)
+    _story_option_record = 0
+    _story_option_confirm = Timer(0.3, count=0)
 
     def _story_option_buttons(self):
         """
         Returns:
             list[Button]: List of story options, from upper to bottom. If no option found, return an empty list.
         """
-        image = color_similarity_2d(self.image_area(self._story_option_area), color=self._story_option_color) > 225
+        image = color_similarity_2d(self.image_crop(self._story_option_area), color=self._story_option_color) > 225
         x_count = np.where(np.sum(image, axis=0) > 40)[0]
         if not len(x_count):
             return []
@@ -244,39 +257,58 @@ class InfoHandler(ModuleBase):
 
         return buttons
 
-    def story_skip(self):
-        if self.story_popup_timout.started() and not self.story_popup_timout.reached():
+    def story_skip(self, drop=None):
+        if self.story_popup_timeout.started() and not self.story_popup_timeout.reached():
             if self.handle_popup_confirm('STORY_SKIP'):
-                self.story_popup_timout = Timer(10)
+                self.story_popup_timeout = Timer(10)
                 self.interval_reset(STORY_SKIP)
                 self.interval_reset(STORY_LETTERS_ONLY)
                 return True
-        if self.appear(STORY_LETTER_BLACK) and self.appear_then_click(STORY_LETTERS_ONLY, offset=True, interval=2):
-            self.story_popup_timout.reset()
+        if self.appear(STORY_LETTER_BLACK) and self.appear_then_click(STORY_LETTERS_ONLY, offset=(20, 20), interval=2):
+            self.story_popup_timeout.reset()
             return True
-        if self._story_option_timer.reached() and self.appear(STORY_SKIP, offset=True, interval=0):
+        if self._story_option_timer.reached() and self.appear(STORY_SKIP, offset=(20, 20), interval=0):
             options = self._story_option_buttons()
-            if len(options):
-                self.device.click(options[0])
-                self._story_option_timer.reset()
-                self.story_popup_timout.reset()
-                self.interval_reset(STORY_SKIP)
-                self.interval_reset(STORY_LETTERS_ONLY)
-                return True
-        if self.appear_then_click(STORY_SKIP, offset=True, interval=2):
-            self.story_popup_timout.reset()
+            options_count = len(options)
+            logger.attr('Story_options', options_count)
+            if not options_count:
+                self._story_option_record = 0
+                self._story_option_confirm.reset()
+            elif options_count == self._story_option_record:
+                if self._story_option_confirm.reached():
+                    try:
+                        select = options[self.config.STORY_OPTION]
+                    except IndexError:
+                        select = options[0]
+                    self.device.click(select)
+                    self._story_option_timer.reset()
+                    self.story_popup_timeout.reset()
+                    self.interval_reset(STORY_SKIP)
+                    self.interval_reset(STORY_LETTERS_ONLY)
+                    self._story_option_record = 0
+                    self._story_option_confirm.reset()
+                    return True
+            else:
+                self._story_option_record = options_count
+                self._story_option_confirm.reset()
+        if self.appear(STORY_SKIP, offset=(20, 20), interval=2):
+            if drop:
+                drop.handle_add(self, before=2)
+            self.device.click(STORY_SKIP)
+            self.story_popup_timeout.reset()
             return True
         if self.appear_then_click(GAME_TIPS, offset=(20, 20), interval=2):
-            self.story_popup_timout.reset()
+            self.story_popup_timeout.reset()
             return True
 
         return False
 
-    def handle_story_skip(self):
-        if self.map_has_clear_mode:
+    def handle_story_skip(self, drop=None):
+        # Rerun events in clear mode but still have stories.
+        if self.map_has_clear_mode and self.config.Campaign_Event != 'event_20201012_cn':
             return False
 
-        return self.story_skip()
+        return self.story_skip(drop=drop)
 
     def ensure_no_story(self, skip_first_screenshot=True):
         logger.info('Ensure no story')

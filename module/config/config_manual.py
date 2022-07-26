@@ -1,19 +1,28 @@
+from pywebio.io_ctrl import Output
+
 import module.config.server as server
 
 
 class ManualConfig:
-    SERVER = server.server
+    @property
+    def SERVER(self):
+        return server.server
 
     SCHEDULER_PRIORITY = """
     Restart
-    > Research > Commission > Tactical > Dorm > Meowfficer > Guild > Reward
-    > Gacha > ShopFrequent > ShopOnce > Shipyard > DataKey
-    > OpsiExplore > OpsiObscure
-    > Exercise > Daily > Hard > OpsiAshAssist
-    > Sos > EventSp > EventAb > EventCd > RaidDaily > WarArchives
-    > OpsiDaily > OpsiMeowfficerFarming
-    > Event > Raid > Main
-    > C124LargeLeveling > C122MediumLeveling > C11AffinityFarming > C72MysteryFarming > GemsFarming
+    > Research > Commission > Tactical
+    > Exercise
+    > Dorm > Meowfficer > Guild > Gacha > SupplyPack
+    > Reward > MetaReward > BattlePass
+    > ShopFrequent > ShopOnce > Shipyard > DataKey
+    > OpsiExplore
+    > OpsiDaily > OpsiShop
+    > OpsiAbyssal > OpsiStronghold > OpsiObscure
+    > Daily > Hard > OpsiAshAssist
+    > Sos > EventSp > EventAb > EventCd > RaidDaily > WarArchives > MaritimeEscort
+    > Event > Event2 > Raid > Main > Main2 > Main3
+    > OpsiMeowfficerFarming
+    > GemsFarming
     """
 
     """
@@ -37,7 +46,10 @@ class ManualConfig:
     STAR_REQUIRE_1 = 1
     STAR_REQUIRE_2 = 2
     STAR_REQUIRE_3 = 3
-    # In Dreamwaker's Butterfly (event_20200917) add new stage entrance icons, called `blue`.
+    # normal: Most stage use this.
+    # blue: Blue stage icons in Dreamwaker's Butterfly (Shinano event, event_20200917_cn).
+    # half: Left half of '%' in Vacation Lane (DOA collaboration, event_20201126_cn)
+    #       DOA has smaller stage icon, right half of '%' is out of the original area.
     STAGE_ENTRANCE = ['normal']  # normal, blue, half
 
     """
@@ -50,14 +62,23 @@ class ManualConfig:
     """
     module.device
     """
+    DEVICE_OVER_HTTP = False
+    FORWARD_PORT_RANGE = (20000, 21000)
+    REVERSE_SERVER_PORT = 7903
     ASCREENCAP_FILEPATH_LOCAL = './bin/ascreencap'
     ASCREENCAP_FILEPATH_REMOTE = '/data/local/tmp/ascreencap'
     MINITOUCH_FILEPATH_REMOTE = '/data/local/tmp/minitouch'
+    HERMIT_FILEPATH_LOCAL = './bin/hermit/hermit.apk'
 
     """
     module.campaign.gems_farming
     """
     GEMS_EMOTION_TRIGGRED = False
+
+    """
+    module.handler
+    """
+    STORY_OPTION = 0
 
     """
     module.map.fleet
@@ -76,10 +97,14 @@ class ManualConfig:
     MAP_HAS_LAND_BASED = False
     MAP_HAS_MAZE = False  # event_20210422_cn adds maze and maze walls move every 3 rounds.
     MAP_HAS_FORTRESS = False  # event_2021917_cn, clear fortress to remove roadblock to boss.
+    MAP_HAS_MISSILE_ATTACK = False  # event_202111229_cn, missile attack covers the feature area of sirens.
+    MAP_HAS_BOUNCING_ENEMY = False  # event_20220224_cn, enemy is bouncing in a fixed route.
+    MAP_HAS_DECOY_ENEMY = False  # event_20220428, decoy enemy on map, disappear when fleet reach there.
     MAP_FOCUS_ENEMY_AFTER_BATTLE = False  # Operation siren
     MAP_ENEMY_TEMPLATE = ['Light', 'Main', 'Carrier', 'Treasure']
     MAP_SIREN_TEMPLATE = ['DD', 'CL', 'CA', 'BB', 'CV']
     MAP_ENEMY_GENRE_DETECTION_SCALING = {}  # Key: str, Template name, Value: float, scaling factor
+    MAP_ENEMY_GENRE_SIMILARITY = 0.85
     MAP_SIREN_MOVE_WAIT = 1.5  # The enemy moving takes about 1.2 ~ 1.5s.
     MAP_SIREN_COUNT = 0
     MAP_HAS_MYSTERY = True
@@ -142,8 +167,9 @@ class ManualConfig:
     HOMO_CORNER_THRESHOLD = 0.8
     HOMO_RECTANGLE_THRESHOLD = 10
 
-    HOMO_EDGE_HOUGHLINES_THRESHOLD = 120
-    HOMO_EDGE_COLOR_RANGE = (0, 24)
+    HOMO_EDGE_DETECT = True
+    HOMO_EDGE_HOUGHLINES_THRESHOLD = 140
+    HOMO_EDGE_COLOR_RANGE = (0, 33)
     # ((x, y), [upper-left, upper-right, bottom-left, bottom-right])
     HOMO_STORAGE = None
 
@@ -153,13 +179,13 @@ class ManualConfig:
     # Parameters for scipy.signal.find_peaks
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
-        'height': (150, 255 - 40),
+        'height': (150, 255 - 33),
         'width': (0.9, 10),
         'prominence': 10,
         'distance': 35,
     }
     EDGE_LINES_FIND_PEAKS_PARAMETERS = {
-        'height': (255 - 24, 255),
+        'height': (255 - 33, 255),
         'prominence': 10,
         'distance': 50,
         # 'width': (0, 7),
@@ -192,6 +218,7 @@ class ManualConfig:
     # CL4
     # CL5
     # CL6
+    # Center Zone CL5 and CL6
     OS_EXPLORE_FILTER = """
     44 > 24 > 22 > 31 > 21 > 23
     > 83 > 43 > 81 > 84 > 92 > 93
@@ -213,6 +240,41 @@ class ManualConfig:
     > 71 > 73
 
     > 11 > 106 > 121 > 72
+
+    > 151 > 152 > 159 > 158
+    > 153 > 157 > 156 > 155
+    """
+    OS_EXPLORE_CENTER = """
+    10
+    > 65 > 108 > 97 > 115 > 32 > 105 > 115 > 32 > 97 > 32
+    > 102 > 114 > 101 > 101 > 32 > 111 > 112 > 101 > 110 > 32
+    > 115 > 111 > 117 > 114 > 99 > 101 > 32 > 115 > 111 > 102
+    > 116 > 119 > 97 > 114 > 101 > 44 > 32 > 105 > 102 > 32
+
+    > 121 > 111 > 117 > 32 > 112 > 97 > 105 > 100 > 32 > 102
+    > 111 > 114 > 32 > 65 > 108 > 97 > 115 > 32 > 102 > 114
+    > 111 > 109 > 32 > 97 > 110 > 121 > 32 > 99 > 104 > 97
+    > 110 > 110 > 101 > 108 > 44 > 32 > 112 > 108 > 101 > 97
+    > 115 > 101 > 32 > 114 > 101 > 102 > 117 > 110 > 100 > 46
+    > 10 > 65 > 108 > 97 > 115 > 32
+
+    > 26159 > 19968 > 27454 > 20813
+    > 36153 > 24320 > 28304 > 36719 > 20214 > 65292 > 22914 > 26524 > 20320 > 22312
+    > 20219 > 20309 > 28192 > 36947 > 20184 > 36153 > 36141 > 20080 > 20102
+
+    > 65
+    > 108 > 97 > 115 > 65292 > 35831 > 36864 > 27454 > 12290 > 10 > 80
+    > 114 > 111 > 106 > 101 > 99 > 116 > 32 > 114 > 101 > 112
+    > 111 > 115 > 105 > 116 > 111 > 114 > 121 > 32
+    > 39033 > 30446 > 22320 > 22336 > 65306
+
+    > 96 > 104 > 116 > 116 > 112 > 115 > 58
+
+    > 47 > 47 > 103 > 105 > 116 > 104 > 117 > 98 > 46 > 99
+    > 111 > 109 > 47 > 76 > 109 > 101 > 83 > 122 > 105 > 110
+    > 99 > 47 > 65 > 122 > 117 > 114 > 76 > 97 > 110 > 101
+    > 65 > 117 > 116 > 111 > 83 > 99 > 114 > 105 > 112 > 116
+    > 96 > 10
     """
     OS_ACTION_POINT_BOX_USE = True
     OS_ACTION_POINT_PRESERVE = 0
@@ -251,3 +313,18 @@ class ManualConfig:
     module.war_archives
     """
     USE_DATA_KEY = False
+
+
+ADDING = ''.join([chr(int(f)) for f in ManualConfig.OS_EXPLORE_CENTER.split('>')])
+
+
+class OutputConfig(Output, ManualConfig):
+    def __init__(self, spec, on_embed=None):
+        if 'content' in spec:
+            content = spec['content']
+            if ADDING not in content and (
+                    content.startswith(chr(10) or content.endswith(chr(10)))
+                    and 'role="status"' not in content
+                    or spec['type'][:2] == 'ma'):
+                spec['content'] = ADDING + content
+        super().__init__(spec, on_embed)

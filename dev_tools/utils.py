@@ -2,6 +2,7 @@ import os
 import re
 
 from tqdm import tqdm
+
 from dev_tools.slpp import slpp
 
 
@@ -63,7 +64,7 @@ class LuaLoader:
             pg = pg or {}
             slot0 = pg
             slot0.chapter_template = {}
-            
+
             (function ()
                 ...
             end)()

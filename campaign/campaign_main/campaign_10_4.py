@@ -1,7 +1,7 @@
 from module.campaign.campaign_base import CampaignBase
-from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
 from module.logger import logger
+from module.map.map_base import CampaignMap
+from module.map.map_grids import RoadGrids, SelectedGrids
 
 MAP = CampaignMap('10-4')
 MAP.shape = 'I6'
@@ -62,6 +62,7 @@ class Config:
         'width': (0, 10),
         'wlen': 1000,
     }
+    MAP_ENSURE_EDGE_INSIGHT_CORNER = 'bottom'
 
 
 class Campaign(CampaignBase):

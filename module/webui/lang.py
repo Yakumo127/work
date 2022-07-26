@@ -1,9 +1,9 @@
 from typing import Dict
 
 from module.config.utils import *
-from module.webui.config import WebuiConfig
+from module.webui.setting import State
 
-LANG = 'zh-CN'
+LANG = "zh-CN"
 TRANSLATE_MODE = False
 
 
@@ -15,13 +15,14 @@ def set_language(s: str, refresh=False):
             LANG = LANGUAGES[i]
             break
     else:
-        LANG = 'en-US'
+        LANG = "en-US"
 
-    WebuiConfig().Language = LANG
+    State.deploy_config.Language = LANG
 
     if refresh:
         from pywebio.session import run_js
-        run_js('location.reload();')
+
+        run_js("location.reload();")
 
 
 def t(s):
@@ -55,11 +56,8 @@ def reload():
         if lang not in dic_lang:
             dic_lang[lang] = {}
         for path, v in deep_iter(read_file(filepath_i18n(lang)), depth=3):
-            dic_lang[lang]['.'.join(path)] = v
+            dic_lang[lang][".".join(path)] = v
 
     for key in dic_lang["ja-JP"].keys():
         if dic_lang["ja-JP"][key] == key:
             dic_lang["ja-JP"][key] = dic_lang["en-US"][key]
-
-    global LANG
-    LANG = WebuiConfig().Language

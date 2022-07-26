@@ -1,14 +1,13 @@
 from module.campaign.campaign_base import CampaignBase
-from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
 from module.logger import logger
-
+from module.map.map_base import CampaignMap
+from module.map.map_grids import RoadGrids, SelectedGrids
 
 MAP = CampaignMap('sp3')
 MAP.shape = 'i6'
 MAP.map_data = '''
-    ++ MB -- ME -- ME -- ++ ++ 
-    MB -- ME -- ++ -- ME ++ ++ 
+    ++ MB -- ME -- ME -- ++ ++
+    MB -- ME -- ++ -- ME ++ ++
     MB ME -- ME -- ME -- ME --
     ++ ++ ++ -- ME -- ME ++ --
     MB -- ME ME -- ++ -- -- SP

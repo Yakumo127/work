@@ -3,11 +3,12 @@ import os
 import random
 import string
 from datetime import datetime, timedelta, timezone
-from filelock import FileLock
 
 import yaml
+from filelock import FileLock
 
-import module.config.server as server
+import module.config.server as server_
+from module.config.atomicwrites import atomic_write
 
 LANGUAGES = ['zh-CN', 'en-US', 'ja-JP', 'zh-TW']
 SERVER_TO_LANG = {
@@ -18,11 +19,12 @@ SERVER_TO_LANG = {
 }
 LANG_TO_SERVER = {v: k for k, v in SERVER_TO_LANG.items()}
 SERVER_TO_TIMEZONE = {
-    'cn': 8,
-    'en': -7,
-    'jp': 9,
-    'tw': 8,
+    'cn': timedelta(hours=8),
+    'en': timedelta(hours=-7),
+    'jp': timedelta(hours=9),
+    'tw': timedelta(hours=8),
 }
+DEFAULT_TIME = datetime(2020, 1, 1, 0, 0)
 
 
 # https://stackoverflow.com/questions/8640959/how-can-i-control-what-scalar-form-pyyaml-uses-for-my-data/15423007
@@ -111,7 +113,7 @@ def write_file(file, data):
     with lock:
         print(f'write: {file}')
         if ext == '.yaml':
-            with open(file, mode='w', encoding='utf-8') as f:
+            with atomic_write(file, overwrite=True, encoding='utf-8', newline='') as f:
                 if isinstance(data, list):
                     yaml.safe_dump_all(data, f, default_flow_style=False, encoding='utf-8', allow_unicode=True,
                                        sort_keys=False)
@@ -119,27 +121,33 @@ def write_file(file, data):
                     yaml.safe_dump(data, f, default_flow_style=False, encoding='utf-8', allow_unicode=True,
                                    sort_keys=False)
         elif ext == '.json':
-            with open(file, mode='w', encoding='utf-8') as f:
+            with atomic_write(file, overwrite=True, encoding='utf-8', newline='') as f:
                 s = json.dumps(data, indent=2, ensure_ascii=False, sort_keys=False, default=str)
                 f.write(s)
         else:
             print(f'Unsupported config file extension: {ext}')
 
 
-def iter_folder(folder, ext=None):
+def iter_folder(folder, is_dir=False, ext=None):
     """
     Args:
         folder (str):
+        is_dir (bool): True to iter directories only
         ext (str): File extension, such as `.yaml`
 
     Yields:
         str: Absolute path of files
     """
     for file in os.listdir(folder):
-        if ext is not None:
-            _, extension = os.path.splitext(file)
-            if extension == ext:
-                yield os.path.join(folder, file)
+        sub = os.path.join(folder, file)
+        if is_dir:
+            if os.path.isdir(sub):
+                yield sub
+        elif ext is not None:
+            if not os.path.isdir(sub):
+                _, extension = os.path.splitext(file)
+                if extension == ext:
+                    yield os.path.join(folder, file)
         else:
             yield os.path.join(folder, file)
 
@@ -197,6 +205,22 @@ def deep_set(d, keys, value):
         d = {}
     d[keys[0]] = deep_set(d.get(keys[0], {}), keys[1:], value)
     return d
+
+
+def deep_pop(d, keys, default=None):
+    """
+    Pop value from dictionary safely, imitating deep_get().
+    """
+    if isinstance(keys, str):
+        keys = keys.split('.')
+    assert type(keys) is list
+    if not isinstance(d, dict):
+        return default
+    if not keys:
+        return default
+    elif len(keys) == 1:
+        return d.pop(keys[0], default)
+    return deep_pop(d.get(keys[0]), keys[1:], default)
 
 
 def deep_default(d, keys, value):
@@ -342,8 +366,102 @@ def dict_to_kv(dictionary, allow_none=True):
     return ', '.join([f'{k}={repr(v)}' for k, v in dictionary.items() if allow_none or v is not None])
 
 
-def server_timezone():
-    return SERVER_TO_TIMEZONE.get(server.server, 8)
+def server_timezone() -> timedelta:
+    return SERVER_TO_TIMEZONE.get(server_.server, SERVER_TO_TIMEZONE['cn'])
+
+
+def server_time_offset() -> timedelta:
+    """
+    To convert local time to server time:
+        server_time = local_time + server_time_offset()
+    To convert server time to local time:
+        local_time = server_time - server_time_offset()
+    """
+    return datetime.now(timezone.utc).astimezone().utcoffset() - server_timezone()
+
+
+def random_normal_distribution_int(a, b, n=3):
+    """
+    A non-numpy implementation of the `random_normal_distribution_int` in module.base.utils
+
+
+    Generate a normal distribution int within the interval.
+    Use the average value of several random numbers to
+    simulate normal distribution.
+
+    Args:
+        a (int): The minimum of the interval.
+        b (int): The maximum of the interval.
+        n (int): The amount of numbers in simulation. Default to 3.
+
+    Returns:
+        int
+    """
+    if a < b:
+        output = sum([random.randint(a, b) for _ in range(n)]) / n
+        return int(round(output))
+    else:
+        return b
+
+
+def ensure_time(second, n=3, precision=3):
+    """Ensure to be time.
+
+    Args:
+        second (int, float, tuple): time, such as 10, (10, 30), '10, 30'
+        n (int): The amount of numbers in simulation. Default to 5.
+        precision (int): Decimals.
+
+    Returns:
+        float:
+    """
+    if isinstance(second, tuple):
+        multiply = 10 ** precision
+        return random_normal_distribution_int(second[0] * multiply, second[1] * multiply, n) / multiply
+    elif isinstance(second, str):
+        if ',' in second:
+            lower, upper = second.replace(' ', '').split(',')
+            lower, upper = int(lower), int(upper)
+            return ensure_time((lower, upper), n=n, precision=precision)
+        if '-' in second:
+            lower, upper = second.replace(' ', '').split('-')
+            lower, upper = int(lower), int(upper)
+            return ensure_time((lower, upper), n=n, precision=precision)
+        else:
+            return int(second)
+    else:
+        return second
+
+
+def get_os_next_reset():
+    """
+    Get the first day of next month.
+
+    Returns:
+        datetime.datetime
+    """
+    diff = server_time_offset()
+    server_now = datetime.now() - diff
+    server_reset = (server_now.replace(day=1) + timedelta(days=32)) \
+        .replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    local_reset = server_reset + diff
+    return local_reset
+
+
+def get_os_reset_remain():
+    """
+    Returns:
+        int: number of days before next opsi reset
+    """
+    from module.logger import logger
+
+    next_reset = get_os_next_reset()
+    now = datetime.now()
+    logger.attr('OpsiNextReset', next_reset)
+
+    remain = int((next_reset - now).total_seconds() // 86400)
+    logger.attr('ResetRemain', remain)
+    return remain
 
 
 def get_server_next_update(daily_trigger):
@@ -356,14 +474,15 @@ def get_server_next_update(daily_trigger):
     """
     if isinstance(daily_trigger, str):
         daily_trigger = daily_trigger.replace(' ', '').split(',')
-    d = datetime.now(timezone.utc).astimezone()
-    diff = d.utcoffset() // timedelta(seconds=1) // 3600 - server_timezone()
+
+    diff = server_time_offset()
+    local_now = datetime.now()
     trigger = []
     for t in daily_trigger:
         h, m = [int(x) for x in t.split(':')]
-        h = (h + diff) % 24
-        future = datetime.now().replace(hour=h, minute=m, second=0, microsecond=0)
-        future = future + timedelta(days=1) if future < datetime.now() else future
+        future = local_now.replace(hour=h, minute=m, second=0, microsecond=0) + diff
+        s = (future - local_now).total_seconds() % 86400
+        future = local_now + timedelta(seconds=s)
         trigger.append(future)
     update = sorted(trigger)[0]
     return update
@@ -379,16 +498,17 @@ def get_server_last_update(daily_trigger):
     """
     if isinstance(daily_trigger, str):
         daily_trigger = daily_trigger.replace(' ', '').split(',')
-    d = datetime.now(timezone.utc).astimezone()
-    diff = d.utcoffset() // timedelta(seconds=1) // 3600 - server_timezone()
+
+    diff = server_time_offset()
+    local_now = datetime.now()
     trigger = []
     for t in daily_trigger:
         h, m = [int(x) for x in t.split(':')]
-        h = (h + diff) % 24
-        past = datetime.now().replace(hour=h, minute=m, second=0, microsecond=0)
-        past = past - timedelta(days=1) if past > datetime.now() else past
-        trigger.append(past)
-    update = sorted(trigger, reverse=True)[0]
+        future = local_now.replace(hour=h, minute=m, second=0, microsecond=0) + diff
+        s = (future - local_now).total_seconds() % 86400 - 86400
+        future = local_now + timedelta(seconds=s)
+        trigger.append(future)
+    update = sorted(trigger)[-1]
     return update
 
 
@@ -453,5 +573,9 @@ def type_to_str(typ):
         str: Such as `int`, 'datetime.datetime'.
     """
     if not isinstance(typ, type):
-        typ = type(typ)
-    return str(typ).strip("<class '>").replace('<', '_').replace('>', '_')
+        typ = type(typ).__name__
+    return str(typ)
+
+
+if __name__ == '__main__':
+    get_os_reset_remain()

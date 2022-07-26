@@ -43,9 +43,29 @@ class GridPredictor:
         self.homo_invt = cv2.invert(self.homo_data)[1]
 
     def screen2grid(self, points):
+        """
+        Args:
+            points (np.ndarray): Coordinates from screen, [[x1, y1], [x2, y2], ...]
+
+        Returns:
+            np.ndarray: Coordinates from sea surface, [[x1, y1], [x2, y2], ...]
+                Coordinate zero point is the upper-left corner.
+            (0, 0) +------+
+                   |      |
+                   |      |
+                   +------+ (1, 1)
+        """
         return perspective_transform(points, self.homo_data) / self.config.HOMO_TILE
 
     def grid2screen(self, points):
+        """
+        Args:
+            points (np.ndarray): Coordinates from sea surface, [[x1, y1], [x2, y2], ...]
+                See Also screen2grid().
+
+        Returns:
+            np.ndarray: Coordinates from screen, [[x1, y1], [x2, y2], ...]
+        """
         return perspective_transform(np.multiply(points, self.config.HOMO_TILE), self.homo_invt)
 
     @cached_property
@@ -73,6 +93,9 @@ class GridPredictor:
         self.is_current_fleet = self.predict_current_fleet()
         # self.is_caught_by_siren = self.predict_caught_by_siren()
 
+        if self.config.MAP_HAS_MISSILE_ATTACK:
+            if self.predict_missile_attack():
+                self.is_missile_attack = True
         if self.enemy_genre:
             self.is_enemy = True
         if self.enemy_scale:
@@ -177,7 +200,7 @@ class GridPredictor:
                     shape = tuple(np.round(np.array((60, 60)) * scale).astype(int))
                     image_dic[scale] = rgb2gray(self.relative_crop((-0.5, -1, 0.5, 0), shape=shape))
 
-                if template.match(image_dic[scale]):
+                if template.match(image_dic[scale], similarity=self.config.MAP_ENEMY_GENRE_SIMILARITY):
                     return name
 
         return None
@@ -196,6 +219,9 @@ class GridPredictor:
                 return True
 
         return False
+
+    def predict_missile_attack(self):
+        return self.relative_rgb_count(area=(-0.5, -1, 0.5, 0), color=(255, 255, 60), shape=(50, 50)) > 35
 
     def predict_fleet(self):
         image = self.relative_crop((-1, -2, -0.5, -1.5), shape=(50, 50))
@@ -257,6 +283,10 @@ class GridPredictor:
                 return True
 
         return False
+
+    def predict_submarine_move(self):
+        # Detect the orange arrow in submarine movement mode.
+        return self.relative_rgb_count((-0.5, -1, 0.5, 0), color=(231, 138, 49), shape=(60, 60)) > 200
 
     @cached_property
     def _image_similar_piece(self):

@@ -1,8 +1,8 @@
+from campaign.campaign_main.campaign_5_1 import Config as ConfigBase
 from module.campaign.campaign_base import CampaignBase
-from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
 from module.logger import logger
-from campaign.campaign_main.campaign_5_1 import Config
+from module.map.map_base import CampaignMap
+from module.map.map_grids import RoadGrids, SelectedGrids
 
 MAP = CampaignMap()
 MAP.shape = 'G5'
@@ -35,6 +35,10 @@ A3, B3, C3, D3, E3, F3, G3, \
 A4, B4, C4, D4, E4, F4, G4, \
 A5, B5, C5, D5, E5, F5, G5, \
     = MAP.flatten()
+
+
+class Config(ConfigBase):
+    HOMO_EDGE_HOUGHLINES_THRESHOLD = 210
 
 
 class Campaign(CampaignBase):

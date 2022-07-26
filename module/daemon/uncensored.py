@@ -1,6 +1,4 @@
-import builtins
-
-from deploy.installer import GitManager
+from deploy.git import GitManager
 from deploy.utils import *
 from module.handler.login import LoginHandler
 from module.logger import logger
@@ -28,7 +26,6 @@ class AzurLaneUncensored(LoginHandler):
         # Running in ./toolkit/AzurLaneUncensored
         os.chdir(folder)
         # Monkey patch `print()` build-in to show logs.
-        backup, builtins.print = builtins.print, logger.info
         manager.git_repository_init(
             repo=repo,
             source='origin',
@@ -36,11 +33,10 @@ class AzurLaneUncensored(LoginHandler):
             proxy=manager.config['GitProxy'],
             keep_changes=False
         )
-        builtins.print = backup
 
         logger.hr('Push Uncensored Files', level=1)
         logger.info('This will take a few seconds')
-        command = ['push', 'files', f'/sdcard/Android/data/{self.config.Emulator_PackageName}']
+        command = ['push', 'files', f'/sdcard/Android/data/{self.device.package}']
         logger.info(f'Command: {command}')
         self.device.adb_command(command, timeout=30)
         logger.info('Push success')

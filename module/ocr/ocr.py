@@ -1,49 +1,26 @@
 import re
 import time
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from module.base.button import Button
 from module.base.utils import *
 from module.logger import logger
-from module.ocr.al_ocr import AlOcr
+from module.ocr.rpc import ModelProxyFactory
+from module.webui.setting import State
 
-OCR_MODEL = {
-    # Folder: ./bin/cnocr_models/azur_lane
-    # Size: 3.25MB
-    # Model: densenet-lite-gru
-    # Epoch: 15
-    # Validation accuracy: 99.43%
-    # Font: Impact, AgencyFB-Regular, MStiffHeiHK-UltraBold
-    # Charset: 0123456789ABCDEFGHIJKLMNPQRSTUVWXYZ:/- (Letter 'O' and <space> is not included)
-    # _num_classes: 39
-    'azur_lane': AlOcr(model_name='densenet-lite-gru', model_epoch=15, root='./bin/cnocr_models/azur_lane',
-                       name='azur_lane'),
+if TYPE_CHECKING:
+    from module.ocr.al_ocr import AlOcr
 
-    # Folder: ./bin/cnocr_models/cnocr
-    # Size: 9.51MB
-    # Model: densenet-lite-gru
-    # Epoch: 39
-    # Validation accuracy: 99.04%
-    # Font: Various
-    # Charset: Number, English character, Chinese character, symbols, <space>
-    # _num_classes: 6426
-    'cnocr': AlOcr(model_name='densenet-lite-gru', model_epoch=39, root='./bin/cnocr_models/cnocr', name='cnocr'),
-
-    'jp': AlOcr(model_name='densenet-lite-gru', model_epoch=125, root='./bin/cnocr_models/jp', name='jp'),
-
-    # Folder: ./bin/cnocr_models/tw
-    # Size: 8.43MB
-    # Model: densenet-lite-gru
-    # Epoch: 63
-    # Validation accuracy: 99.24%
-    # Font: Various, 6 kinds
-    # Charset: Numbers, Upper english characters, Chinese traditional characters
-    # _num_classes: 5322
-    'tw': AlOcr(model_name='densenet-lite-gru', model_epoch=63, root='./bin/cnocr_models/tw', name='tw'),
-}
+if not State.deploy_config.UseOcrServer:
+    from module.ocr.models import OCR_MODEL
+else:
+    OCR_MODEL = ModelProxyFactory()
 
 
 class Ocr:
+    SHOW_LOG = True
+
     def __init__(self, buttons, lang='azur_lane', letter=(255, 255, 255), threshold=128, alphabet=None, name=None):
         """
         Args:
@@ -61,7 +38,10 @@ class Ocr:
         self.threshold = threshold
         self.alphabet = alphabet
         self.lang = lang
-        self.cnocr = OCR_MODEL[lang]
+
+    @property
+    def cnocr(self) -> "AlOcr":
+        return OCR_MODEL.__getattribute__(self.lang)
 
     def pre_process(self, image):
         """
@@ -92,13 +72,21 @@ class Ocr:
         return result
 
     def ocr(self, image, direct_ocr=False):
+        """
+        Args:
+            image (np.ndarray, list[np.ndarray]):
+            direct_ocr (bool): True to skip preprocess.
+
+        Returns:
+
+        """
         start_time = time.time()
 
         self.cnocr.set_cand_alphabet(self.alphabet)
         if direct_ocr:
-            image_list = [self.pre_process(np.array(i)) for i in image]
+            image_list = [self.pre_process(i) for i in image]
         else:
-            image_list = [self.pre_process(np.array(image.crop(area))) for area in self.buttons]
+            image_list = [self.pre_process(crop(image, area)) for area in self.buttons]
 
         # This will show the images feed to OCR model
         # self.cnocr.debug(image_list)
@@ -108,8 +96,9 @@ class Ocr:
 
         if len(self.buttons) == 1:
             result_list = result_list[0]
-        logger.attr(name='%s %ss' % (self.name, float2str(time.time() - start_time)),
-                    text=str(result_list))
+        if Ocr.SHOW_LOG:
+            logger.attr(name='%s %ss' % (self.name, float2str(time.time() - start_time)),
+                        text=str(result_list))
 
         return result_list
 
@@ -198,7 +187,7 @@ class Duration(Ocr):
         Returns:
             datetime.timedelta:
         """
-        result = re.search('(\d+):(\d+):(\d+)', string)
+        result = re.search('(\d{1,2}):?(\d{2}):?(\d{2})', string)
         if result:
             result = [int(s) for s in result.groups()]
             return timedelta(hours=result[0], minutes=result[1], seconds=result[2])

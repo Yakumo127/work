@@ -15,7 +15,7 @@ class Filter:
             regex = re.compile(regex)
         self.regex = regex
         self.attr = attr
-        self.preset = preset
+        self.preset = tuple(list(p.lower() for p in preset))
         self.filter_raw = []
         self.filter = []
 
@@ -25,7 +25,7 @@ class Filter:
         self.filter = [self.parse_filter(f) for f in self.filter_raw]
 
     def is_preset(self, filter):
-        return filter in self.preset
+        return len(filter) and filter.lower() in self.preset
 
     def apply(self, objs, func=None):
         """
@@ -41,6 +41,7 @@ class Filter:
         out = []
         for raw, filter in zip(self.filter_raw, self.filter):
             if self.is_preset(raw):
+                raw = raw.lower()
                 if raw not in out:
                     out.append(raw)
             else:
@@ -96,7 +97,7 @@ class Filter:
         if result and len(string) and result.span()[1]:
             return [result.group(index + 1) for index, attr in enumerate(self.attr)]
         else:
-            logger.warning(f'Invalid filter: {string}')
+            logger.warning(f'Invalid filter: "{string}". This selector does not match the regex, nor a preset.')
             # Invalid filter will be ignored.
             # Return strange things and make it impossible to match
             return ['1nVa1d'] + [None] * (len(self.attr) - 1)

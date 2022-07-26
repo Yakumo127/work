@@ -1,13 +1,15 @@
 import time
 
 import numpy as np
-from prettytable import PrettyTable
+from rich.table import Table
+from rich.text import Text
 
 from module.base.utils import float2str as float2str_
 from module.base.utils import random_rectangle_point
+from module.campaign.campaign_ui import CampaignUI
 from module.daemon.daemon_base import DaemonBase
+from module.exception import RequestHumanTakeover
 from module.logger import logger
-from module.ui.ui import UI, page_campaign
 
 
 def float2str(n, decimal=3):
@@ -17,7 +19,7 @@ def float2str(n, decimal=3):
         return float2str_(n, decimal=decimal) + 's'
 
 
-class Benchmark(DaemonBase, UI):
+class Benchmark(DaemonBase, CampaignUI):
     TEST_TOTAL = 15
     TEST_BEST = int(TEST_TOTAL * 0.8)
 
@@ -40,6 +42,10 @@ class Benchmark(DaemonBase, UI):
 
             try:
                 func(*args, **kwargs)
+            except RequestHumanTakeover:
+                logger.critical('RequestHumanTakeover')
+                logger.warning(f'Benchmark tests failed on func: {func.__name__}')
+                return 'Failed'
             except Exception as e:
                 logger.exception(e)
                 logger.warning(f'Benchmark tests failed on func: {func.__name__}')
@@ -60,30 +66,32 @@ class Benchmark(DaemonBase, UI):
     @staticmethod
     def evaluate_screenshot(cost):
         if not isinstance(cost, (float, int)):
-            return str(cost)
+            return Text(cost, style="bold bright_red")
 
+        if cost < 0.12:
+            return Text('Ultra Fast', style="bold bright_green")
         if cost < 0.25:
-            return 'Very Fast'
+            return Text('Very Fast', style="bright_green")
         if cost < 0.45:
-            return 'Fast'
+            return Text('Fast', style="green")
         if cost < 0.65:
-            return 'Medium'
+            return Text('Medium', style="yellow")
         if cost < 0.95:
-            return 'Slow'
-        return 'Very Slow'
+            return Text('Slow', style="red")
+        return Text('Very Slow', style="bright_red")
 
     @staticmethod
     def evaluate_click(cost):
         if not isinstance(cost, (float, int)):
-            return str(cost)
+            return Text(cost, style="bold bright_red")
 
         if cost < 0.1:
-            return 'Fast'
+            return Text('Fast', style="bright_green")
         if cost < 0.2:
-            return 'Medium'
+            return Text('Medium', style="yellow")
         if cost < 0.4:
-            return 'Slow'
-        return 'Very Slow'
+            return Text('Slow', style="red")
+        return Text('Very Slow', style="bright_red")
 
     @staticmethod
     def show(test, data, evaluate_func):
@@ -96,35 +104,60 @@ class Benchmark(DaemonBase, UI):
         |  aScreenCap  | Failed | Failed |
         +--------------+--------+--------+
         """
-        table = PrettyTable()
-        table.field_names = [test, 'Time', 'Speed']
-        for row in data:
-            table.add_row([row[0], f'{float2str(row[1])}', evaluate_func(row[1])])
+        # table = PrettyTable()
+        # table.field_names = [test, 'Time', 'Speed']
+        # for row in data:
+        #     table.add_row([row[0], f'{float2str(row[1])}', evaluate_func(row[1])])
 
-        for row in table.get_string().split('\n'):
-            logger.info(row)
+        # for row in table.get_string().split('\n'):
+        #     logger.info(row)
+        table = Table(show_lines=True)
+        table.add_column(
+            test, header_style="bright_cyan", style="cyan", no_wrap=True
+        )
+        table.add_column("Time", style="magenta")
+        table.add_column("Speed", style="green")
+        for row in data:
+            table.add_row(
+                row[0],
+                float2str(row[1]),
+                evaluate_func(row[1]),
+            )
+        logger.print(table, justify='center')
 
     def run(self):
         logger.hr('Benchmark', level=1)
-        self.device.remove_minicap()
-        self.ui_ensure(page_campaign)
+        self.device.uninstall_minicap()
+        self.ui_goto_campaign()
+        self.campaign_set_chapter('7-2')
 
         data = []
-        if self.config.Benchmark_TestScreenshotMethod:
-            data.append(['ADB', self.benchmark_test(self.device._screenshot_adb)])
-            data.append(['uiautomator2', self.benchmark_test(self.device._screenshot_uiautomator2)])
-            data.append(['aScreenCap', self.benchmark_test(self.device._screenshot_ascreencap)])
+        if self.config.Benchmark_AdbScreenshot:
+            data.append(['ADB', self.benchmark_test(self.device.screenshot_adb)])
+        if self.config.Benchmark_AdbncScreenshot:
+            data.append(['ADB_nc', self.benchmark_test(self.device.screenshot_adb_nc)])
+        if self.config.Benchmark_Uiautomator2Screenshot:
+            data.append(['uiautomator2', self.benchmark_test(self.device.screenshot_uiautomator2)])
+        if self.config.Benchmark_AscreencapScreenshot:
+            data.append(['aScreenCap', self.benchmark_test(self.device.screenshot_ascreencap)])
+        if self.config.Benchmark_AscreencapncScreenshot:
+            data.append(['aScreenCap_nc', self.benchmark_test(self.device.screenshot_ascreencap_nc)])
         screenshot = data
 
         data = []
         area = (124, 4, 649, 106)  # Somewhere save to click.
-        if self.config.Benchmark_TestClickMethod:
+        if self.config.Benchmark_AdbClick:
             x, y = random_rectangle_point(area)
-            data.append(['ADB', self.benchmark_test(self.device._click_adb, x, y)])
+            data.append(['ADB', self.benchmark_test(self.device.click_adb, x, y)])
+        if self.config.Benchmark_Uiautomator2Click:
             x, y = random_rectangle_point(area)
-            data.append(['uiautomator2', self.benchmark_test(self.device._click_uiautomator2, x, y)])
+            data.append(['uiautomator2', self.benchmark_test(self.device.click_uiautomator2, x, y)])
+        if self.config.Benchmark_MinitouchClick:
             x, y = random_rectangle_point(area)
-            data.append(['minitouch', self.benchmark_test(self.device._click_minitouch, x, y)])
+            data.append(['minitouch', self.benchmark_test(self.device.click_minitouch, x, y)])
+        if self.config.Benchmark_HermitClick:
+            x, y = random_rectangle_point(area)
+            data.append(['Hermit', self.benchmark_test(self.device.click_hermit, x, y)])
         control = data
 
         def compare(res):

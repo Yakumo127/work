@@ -6,7 +6,7 @@ import numpy as np
 from module.base.decorator import cached_property
 from module.base.utils import random_normal_distribution_int
 from module.config.config import AzurLaneConfig
-from module.exception import ScriptError, ScriptEnd
+from module.exception import ScriptEnd, ScriptError
 from module.logger import logger
 
 DIC_LIMIT = {
@@ -175,6 +175,15 @@ class Emotion:
         else:
             return 2
 
+    @property
+    def reduce_per_battle_before_entering(self):
+        if self.map_is_2x_book:
+            return 4
+        elif self.config.Campaign_Use2xBook:
+            return 4
+        else:
+            return 2
+
     def check_reduce(self, battle):
         """
         Check emotion before entering a campaign.
@@ -185,10 +194,10 @@ class Emotion:
         Raise:
             ScriptEnd: Delay current task to prevent emotion control in the future.
         """
-        if self.config.Campaign_UseAutoSearch:
-            method = self.config.Fleet_AutoSearchFleetOrder
-        else:
-            method = self.config.Fleet_FleetOrder
+        if not self.config.Emotion_CalculateEmotion:
+            return
+
+        method = self.config.Fleet_FleetOrder
 
         if method == 'fleet1_mob_fleet2_boss':
             battle = (battle - 1, 1)
@@ -201,7 +210,7 @@ class Emotion:
         else:
             raise ScriptError(f'Unknown fleet order: {method}')
 
-        battle = tuple(np.array(battle) * self.reduce_per_battle)
+        battle = tuple(np.array(battle) * self.reduce_per_battle_before_entering)
         logger.info(f'Expect emotion reduce: {battle}')
 
         self.update()

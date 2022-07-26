@@ -1,5 +1,7 @@
+from typing import Optional, Union
 from filelock import FileLock
 
+from deploy.config import DeployConfig as _DeployConfig
 from deploy.utils import *
 
 
@@ -21,18 +23,9 @@ def poor_yaml_write_with_lock(data, file, template_file=DEPLOY_TEMPLATE):
             return poor_yaml_write(data, file, template_file)
 
 
-class WebuiConfig:
-    Language = 'zh-CN'
-
-    def __init__(self, file=DEPLOY_CONFIG):
-        """
-        Args:
-            file (str): User deploy config.
-        """
-        self.file = file
-        self.config = {}
-        self.read()
-        self.write()
+class DeployConfig(_DeployConfig):
+    def show_config(self):
+        pass
 
     def read(self):
         """
@@ -51,7 +44,7 @@ class WebuiConfig:
         """
         poor_yaml_write_with_lock(self.config, self.file)
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value):
         """
         Catch __setattr__, copy to `self.config`, write deploy config.
         """

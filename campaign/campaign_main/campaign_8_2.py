@@ -1,7 +1,8 @@
 from module.campaign.campaign_base import CampaignBase
-from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
 from module.logger import logger
+from module.map.map_base import CampaignMap
+from module.map.map_grids import RoadGrids, SelectedGrids
+
 from .campaign_8_1 import Config as ConfigBase
 
 MAP = CampaignMap('8-3')
@@ -21,7 +22,6 @@ MAP.weight_data = """
     20 20 20 10 10 20 20 35
     50 90 90 60 60 90 90 90
     90 90 90 70 80 90 90 90
-    
 """
 MAP.spawn_data = [
     {'battle': 0, 'enemy': 3},
@@ -46,7 +46,7 @@ step_on = SelectedGrids([D3, E3])
 
 
 class Config(ConfigBase):
-    pass
+    HOMO_EDGE_HOUGHLINES_THRESHOLD = 210
 
 
 class Campaign(CampaignBase):

@@ -1,7 +1,8 @@
-from .campaign_base import CampaignBase
-from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
 from module.logger import logger
+from module.map.map_base import CampaignMap
+from module.map.map_grids import RoadGrids, SelectedGrids
+
+from .campaign_base import CampaignBase
 
 MAP = CampaignMap('SOS')
 MAP.shape = 'I6'
@@ -54,6 +55,7 @@ class Config:
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40
     COINCIDENT_POINT_ENCOURAGE_DISTANCE = 1.5
+    HOMO_EDGE_HOUGHLINES_THRESHOLD = 210
 
 
 class Campaign(CampaignBase):

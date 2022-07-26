@@ -1,8 +1,8 @@
-from module.campaign.campaign_base import CampaignBase
-from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
-from module.logger import logger
 from campaign.campaign_main.campaign_12_1 import Config
+from module.campaign.campaign_base import CampaignBase
+from module.logger import logger
+from module.map.map_base import CampaignMap
+from module.map.map_grids import RoadGrids, SelectedGrids
 
 MAP = CampaignMap('12-4')
 MAP.shape = 'K8'
@@ -54,7 +54,7 @@ class Campaign(CampaignBase):
     MAP = MAP
 
     def battle_0(self):
-        if self.battle_count > 3:
+        if self.battle_count >= 3:
             self.pick_up_ammo()
 
         if self.clear_roadblocks([road_main]):

@@ -1,7 +1,7 @@
 from module.base.decorator import Config, cached_property
 from module.campaign.campaign_ui import CampaignUI
 from module.combat.auto_search_combat import AutoSearchCombat
-from module.exception import CampaignEnd, ScriptError, MapEnemyMoved
+from module.exception import CampaignEnd, MapEnemyMoved, ScriptError
 from module.logger import logger
 from module.map.map import Map
 from module.map.map_base import CampaignMap
@@ -61,12 +61,17 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
             .delete(self.map.select(is_boss=True))
         logger.info(f'Enemy remain: {remain}')
         if remain.count > 0:
-            if self.clear_siren():
-                return True
-
-            self.clear_mechanism()
-
-            return self.battle_default()
+            if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
+                if self.clear_any_enemy(sort=('cost_2',)):
+                    return True
+                return self.battle_default()
+            else:
+                if self.clear_bouncing_enemy():
+                    return True
+                if self.clear_siren():
+                    return True
+                self.clear_mechanism()
+                return self.battle_default()
         else:
             result = self.battle_boss()
             return result
@@ -115,8 +120,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         logger.hr(self.ENTRANCE, level=2)
 
         # Enter map
-        if self.config.Emotion_CalculateEmotion:
-            self.emotion.check_reduce(self._map_battle)
+        self.emotion.check_reduce(self._map_battle)
         self.ENTRANCE.area = self.ENTRANCE.button
         self.enter_map(self.ENTRANCE, mode=self.config.Campaign_Mode)
 

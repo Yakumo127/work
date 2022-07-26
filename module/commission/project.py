@@ -1,12 +1,13 @@
 import re
 from datetime import datetime, timedelta
 
+import module.config.server as server
 from module.base.decorator import Config
 from module.base.filter import Filter
 from module.base.utils import *
 from module.commission.project_data import *
 from module.logger import logger
-from module.ocr.ocr import Ocr, Duration
+from module.ocr.ocr import Duration, Ocr
 from module.reward.assets import *
 
 COMMISSION_FILTER = Filter(
@@ -19,7 +20,7 @@ COMMISSION_FILTER = Filter(
         '(\d\d?.\d\d?|\d\d?)?'
     ),
     attr=('category_str', 'genre_str', 'duration_hm', 'duration_hour'),
-    preset=('shortest')
+    preset=('shortest',)
 )
 SHORTEST_FILTER = """
 0:20 > 0:30
@@ -36,8 +37,13 @@ class SuffixOcr(Ocr):
         image = super().pre_process(image)
 
         left = np.where(np.min(image[5:-5, :], axis=0) < 85)[0]
+        # Look back several pixels
+        if server.server in ['jp']:
+            look_back = 21
+        else:
+            look_back = 18
         if len(left):
-            image = image[:, left[-1] - 15:]
+            image = image[:, left[-1] - look_back:]
 
         return image
 
@@ -123,7 +129,7 @@ class Commission:
         area = area_offset((-49, 68, -45, 84), self.area[0:2])
         button = Button(area=area, color=(189, 65, 66),
                         button=area, name='IS_URGENT')
-        if button.appear_on(self.image):
+        if button.appear_on(self.image, threshold=30):
             area = area_offset((-49, 67, 45, 94), self.area[0:2])
             button = Button(area=area, color=(), button=area, name='EXPIRE')
             ocr = Duration(button)
@@ -167,7 +173,7 @@ class Commission:
         area = area_offset((-49, 68, -45, 84), self.area[0:2])
         button = Button(area=area, color=(189, 65, 66),
                         button=area, name='IS_URGENT')
-        if button.appear_on(self.image):
+        if button.appear_on(self.image, threshold=30):
             area = area_offset((-49, 67, 45, 94), self.area[0:2])
             button = Button(area=area, color=(), button=area, name='EXPIRE')
             ocr = Duration(button)
@@ -211,7 +217,7 @@ class Commission:
         area = area_offset((-49, 68, -45, 84), self.area[0:2])
         button = Button(area=area, color=(189, 65, 66),
                         button=area, name='IS_URGENT')
-        if button.appear_on(self.image):
+        if button.appear_on(self.image, threshold=30):
             area = area_offset((-49, 67, 45, 94), self.area[0:2])
             button = Button(area=area, color=(), button=area, name='EXPIRE')
             ocr = Duration(button)
@@ -255,7 +261,7 @@ class Commission:
         area = area_offset((-49, 68, -45, 84), self.area[0:2])
         button = Button(area=area, color=(189, 65, 66),
                         button=area, name='IS_URGENT')
-        if button.appear_on(self.image):
+        if button.appear_on(self.image, threshold=30):
             area = area_offset((-49, 67, 45, 94), self.area[0:2])
             button = Button(area=area, color=(), button=area, name='EXPIRE')
             ocr = Duration(button)

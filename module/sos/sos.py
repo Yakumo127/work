@@ -1,6 +1,5 @@
 from campaign.campaign_sos.campaign_base import CampaignBase
-from module.base.decorator import Config
-from module.base.decorator import cached_property
+from module.base.decorator import Config, cached_property
 from module.base.utils import area_pad, random_rectangle_vector
 from module.campaign.run import CampaignRun
 from module.logger import logger
@@ -12,7 +11,6 @@ from module.ui.page import page_campaign
 from module.ui.scroll import Scroll
 
 OCR_SOS_SIGNAL = Digit(OCR_SIGNAL, letter=(255, 255, 255), threshold=128, name='OCR_SOS_SIGNAL')
-SOS_SCROLL = Scroll(SOS_SCROLL_AREA, color=(164, 173, 189), name='SOS_SCROLL')
 
 
 class CampaignSos(CampaignRun, CampaignBase):
@@ -28,9 +26,24 @@ class CampaignSos(CampaignRun, CampaignBase):
         return [-430, 8, -382, 45]
 
     @cached_property
+    @Config.when(SERVER='tw')
+    def _sos_chapter_crop(self):
+        return [-400, 8, -370, 45]
+
+    @cached_property
     @Config.when(SERVER=None)
     def _sos_chapter_crop(self):
         return [-403, 8, -381, 35]
+
+    @cached_property
+    @Config.when(SERVER='tw')
+    def _sos_scroll(self):
+        return Scroll(SOS_SCROLL_AREA, color=(247, 210, 66), name='SOS_SCROLL')
+
+    @cached_property
+    @Config.when(SERVER=None)
+    def _sos_scroll(self):
+        return Scroll(SOS_SCROLL_AREA, color=(164, 173, 189), name='SOS_SCROLL')
 
     def _find_target_chapter(self, chapter):
         """
@@ -50,8 +63,10 @@ class CampaignSos(CampaignRun, CampaignBase):
             return None
 
         chapter_buttons = [button.crop(self._sos_chapter_crop) for button in all_buttons]
-        ocr_chapters = Digit(chapter_buttons, letter=[132, 230, 115], threshold=128, name='OCR_SOS_CHAPTER')
+        ocr_chapters = Digit(chapter_buttons, letter=[132, 230, 115], threshold=136, name='OCR_SOS_CHAPTER')
         chapter_list = ocr_chapters.ocr(self.device.image)
+        if not isinstance(chapter_list, list):
+            chapter_list = [chapter_list]
         if chapter in chapter_list:
             logger.info('Target SOS chapter found')
             return all_buttons[chapter_list.index(chapter)]
@@ -63,6 +78,7 @@ class CampaignSos(CampaignRun, CampaignBase):
     def _sos_signal_select(self, chapter):
         """
         select a SOS signal
+        EN has no scroll bar, so the swipe signal list.
 
         Args:
             chapter (int): 3 to 10.
@@ -123,7 +139,10 @@ class CampaignSos(CampaignRun, CampaignBase):
             positions = [0.0, 0.5, 1.0]
 
         for scroll_position in positions:
-            SOS_SCROLL.set(scroll_position, main=self)
+            if self._sos_scroll.appear(main=self):
+                self._sos_scroll.set(scroll_position, main=self, distance_check=False)
+            else:
+                logger.info('SOS signal scroll not appear, skip setting scroll position')
             target_button = self._find_target_chapter(chapter)
             if target_button is not None:
                 self._sos_signal_confirm(entrance=target_button)
@@ -149,7 +168,7 @@ class CampaignSos(CampaignRun, CampaignBase):
                 self.device.screenshot()
 
             if self.appear(SIGNAL_LIST_CHECK, offset=(20, 20), interval=2):
-                image = self.image_area(area_pad(entrance.area, pad=-30))
+                image = self.image_crop(area_pad(entrance.area, pad=-30))
                 if TEMPLATE_SIGNAL_SEARCH.match(image):
                     self.device.click(entrance)
                 if TEMPLATE_SIGNAL_GOTO.match(image):

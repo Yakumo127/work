@@ -1,11 +1,12 @@
 import asyncio
+import filecmp
 import os
 import re
+import shutil
 import subprocess
 import winreg
-import shutil
-import filecmp
 
+from deploy.logger import logger
 from deploy.utils import cached_property
 
 asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
@@ -13,6 +14,7 @@ asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 class VirtualBoxEmulator:
     UNINSTALL_REG = "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+    UNINSTALL_REG_2 = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
 
     def __init__(self, name, root_path, adb_path, vbox_path, vbox_name):
         """
@@ -38,7 +40,10 @@ class VirtualBoxEmulator:
         Raises:
             FileNotFoundError: If emulator not installed.
         """
-        reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f'{self.UNINSTALL_REG}\\{self.name}', 0)
+        try:
+            reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f'{self.UNINSTALL_REG}\\{self.name}', 0)
+        except FileNotFoundError:
+            reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f'{self.UNINSTALL_REG_2}\\{self.name}', 0)
         res = winreg.QueryValueEx(reg, 'UninstallString')[0]
 
         file = re.search('"(.*?)"', res)
@@ -96,31 +101,31 @@ class VirtualBoxEmulator:
             adb (str): Absolute path to adb.exe
         """
         for ori, bak in zip(self.adb_binary, self.adb_backup):
-            print(f'Replacing {ori}')
+            logger.info(f'Replacing {ori}')
             if os.path.exists(ori):
                 if filecmp.cmp(adb, ori, shallow=True):
-                    print(f'{adb} is same as {ori}, skip')
+                    logger.info(f'{adb} is same as {ori}, skip')
                 else:
-                    print(f'{ori} -----> {bak}')
+                    logger.info(f'{ori} -----> {bak}')
                     shutil.move(ori, bak)
-                    print(f'{adb} -----> {ori}')
+                    logger.info(f'{adb} -----> {ori}')
                     shutil.copy(adb, ori)
             else:
-                print(f'{ori} not exists, skip')
+                logger.info(f'{ori} not exists, skip')
 
     def adb_recover(self):
         """ Revert adb replacement """
         for ori in self.adb_binary:
-            print(f'Recovering {ori}')
+            logger.info(f'Recovering {ori}')
             bak = f'{ori}.bak'
             if os.path.exists(bak):
-                print(f'Delete {ori}')
+                logger.info(f'Delete {ori}')
                 if os.path.exists(ori):
                     os.remove(ori)
-                print(f'{bak} -----> {ori}')
+                logger.info(f'{bak} -----> {ori}')
                 shutil.move(bak, ori)
             else:
-                print(f'Not exists {bak}, skip')
+                logger.info(f'Not exists {bak}, skip')
 
 
 # NoxPlayer 夜神模拟器
@@ -184,12 +189,28 @@ class EmulatorConnect:
     def __init__(self, adb='adb.exe'):
         self.adb_binary = adb
 
-    def _execute(self, cmd):
-        cmd = [self.adb_binary] + cmd
+    def _execute(self, cmd, timeout=10, output=True):
+        """
+        Returns:
+            Object: Stdout(str) of cmd if output,
+                    return code(int) of cmd if not output.
+        """
+        if not output:
+            cmd.extend(['>nul', '2>nul'])
+        logger.info(' '.join(cmd))
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
-        stdout, stderr = process.communicate(timeout=10)
-        result = stdout.decode()
-        return result
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+            ret_code = process.returncode
+        except subprocess.TimeoutExpired:
+            process.kill()
+            stdout, stderr = process.communicate()
+            ret_code = 1
+            logger.info(f'TimeoutExpired, stdout={stdout}, stderr={stderr}')
+        if output:
+            return stdout
+        else:
+            return ret_code
 
     @cached_property
     def emulators(self):
@@ -205,7 +226,7 @@ class EmulatorConnect:
             except FileNotFoundError:
                 continue
             if len(serial):
-                print(f'Emulator {emulator.name} found, instances: {serial}')
+                logger.info(f'Emulator {emulator.name} found, instances: {serial}')
 
         return emulators
 
@@ -214,7 +235,7 @@ class EmulatorConnect:
         Returns:
             list[str]: Connected devices in adb
         """
-        result = self._execute(['devices'])
+        result = self._execute([self.adb_binary, 'devices']).decode()
         devices = []
         for line in result.replace('\r\r\n', '\n').replace('\r\n', '\n').split('\n'):
             if line.startswith('List') or '\t' not in line:
@@ -223,12 +244,32 @@ class EmulatorConnect:
             if status == 'device':
                 devices.append(serial)
 
-        print(f'Devices: {devices}')
+        logger.info(f'Devices: {devices}')
         return devices
 
     def adb_kill(self):
-        self._execute(['devices'])
-        self._execute(['kill-server'])
+        # self._execute([self.adb_binary, 'devices'])
+        # self._execute([self.adb_binary, 'kill-server'])
+
+        # Just kill it, because some adb don't obey.
+        logger.info('Kill all known ADB')
+        for exe in [
+            # Most emulator use this
+            'adb.exe',
+            # NoxPlayer 夜神模拟器
+            'nox_adb.exe',
+            # MumuPlayer MuMu模拟器
+            'adb_server.exe',
+            # Bluestacks 蓝叠模拟器
+            'HD-Adb.exe'
+        ]:
+            ret_code = self._execute(['taskkill', '/f', '/im', exe], output=False)
+            if ret_code == 0:
+                logger.info(f'Task {exe} killed')
+            elif ret_code == 128:
+                logger.info(f'Task {exe} not found')
+            else:
+                logger.info(f'Error occurred when killing task {exe}, return code {ret_code}')
 
     @cached_property
     def serial(self):
@@ -285,4 +326,4 @@ class EmulatorConnect:
 
 if __name__ == '__main__':
     emu = EmulatorConnect()
-    print(emu.brute_force_connect())
+    logger.info(emu.brute_force_connect())

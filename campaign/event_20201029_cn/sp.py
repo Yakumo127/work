@@ -1,7 +1,8 @@
-from .campaign_base import CampaignBase
-from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
 from module.logger import logger
+from module.map.map_base import CampaignMap
+from module.map.map_grids import RoadGrids, SelectedGrids
+
+from .campaign_base import CampaignBase
 
 MAP = CampaignMap('SP')
 MAP.shape = 'G8'
@@ -77,6 +78,9 @@ class Config:
         # 'width': (0, 7),
         'wlen': 1000
     }
+    HOMO_EDGE_COLOR_RANGE = (0, 9)
+    HOMO_EDGE_HOUGHLINES_THRESHOLD = 180
+    MAP_ENSURE_EDGE_INSIGHT_CORNER = 'bottom'
 
 
 class Campaign(CampaignBase):

@@ -1,13 +1,13 @@
 # This module is a ton of shit
 # you'd better close right now
-from module.config.utils import (LANGUAGES, deep_get, deep_iter, deep_set,
-                                 filepath_i18n, read_file, write_file)
-import module.webui.lang as lang
-from pywebio import config
 from pywebio.input import (actions, checkbox, input, input_group, input_update,
                            select)
 from pywebio.output import put_buttons, put_markdown
-from pywebio.session import defer_call, hold, set_env
+from pywebio.session import defer_call, hold, run_js, set_env
+
+import module.webui.lang as lang
+from module.config.utils import (LANGUAGES, deep_get, deep_iter, deep_set,
+                                 filepath_i18n, read_file, write_file)
 
 
 def translate():
@@ -15,12 +15,12 @@ def translate():
         Translate Alas
     """
     set_env(output_animation=False)
-    config(css_style=r"footer{display:none;}")
+    run_js(r"""$('head').append('<style>footer {display: none}</style>')""")
 
     put_markdown("""
         # Translate
         You can submit(Next) by press `Enter`.
-    """, strip_indent=8)
+    """)
 
     dict_lang = {
         "zh-CN": read_file(filepath_i18n('zh-CN')),
@@ -34,7 +34,7 @@ def translate():
         "en-US": {},
         "ja-JP": {},
     }
-    
+
     list_path = []  # Menu.Task.name
     list_group = []  # Menu
     list_arg = []  # Task

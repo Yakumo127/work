@@ -2,10 +2,10 @@ import os
 import re
 
 from dev_tools.slpp import slpp
-from module.base.utils import location2node
-from module.map.utils import *
 from dev_tools.utils import LuaLoader
+from module.base.utils import location2node
 from module.logger import logger
+from module.map.utils import *
 
 """
 This an auto-tool to extract map files used in Alas.
@@ -82,11 +82,13 @@ DIC_SIREN_NAME_CHI_TO_ENG = {
     'z24': 'Z24',
     'niulunbao': 'Nuremberg',
     'longqibing': 'Carabiniere',
+    # siren_ii has purple lightning around
+    # Detect area of DD and CL are not effected
     'sairenquzhu_ii': 'DD',
     'sairenqingxun_ii': 'CL',
-    'sairenzhongxun_ii': 'CA',
-    'sairenzhanlie_ii': 'BB',
-    'sairenhangmu_ii': 'CV',
+    'sairenzhongxun_ii': 'CAlightning',
+    'sairenzhanlie_ii': 'BBlightning',
+    'sairenhangmu_ii': 'CVlightning',
     'qinraozhe': 'Intruder',
     'xianghe': 'Shokaku',
     'ruihe': 'Zuikaku',
@@ -137,7 +139,44 @@ DIC_SIREN_NAME_CHI_TO_ENG = {
     'shentong': 'Jintsuu',
     'niaohai': 'Choukai',
     'wudao': 'Kirishima',
-    'canglong': 'Souryuu'
+    'canglong': 'Souryuu',
+
+    # Tower of Transcendence
+    'sairenquzhu_6': 'DD',
+    'sairenqingxun_6': 'CL',
+    'sairenzhongxun_6': 'CA',
+    'sairenzhanlie_6': 'BB',
+    'sairenhangmu_6': 'CV',
+
+    # Northern Overture Rerun
+    'ganraozhe': 'Intruder',
+
+    # Abyssal Refrain
+    'lingmin': 'Soobrazitelny',
+    'jifu': 'Kiev',
+    'fuerjia': 'Volga',
+
+    # Aurora Noctis
+    'U81': 'U81',
+    'U101': 'U101',
+    'U522': 'U522',
+    'deyizhi': 'Deutschland',
+    'tierbici': 'Tirpitz',
+    'genaisennao': 'Gneisenau',
+    'shaenhuosite': 'Scharnhorst',
+    'sipeibojue': 'Spee',
+    'U73': 'U73',
+
+    # Rondo at Rainbow's End
+    'z2': 'Z2',
+    'laibixi': 'Leipzig',
+    'ougen': 'PrinzEugen',
+    'sairenqianting_ii': 'SS',
+    'sairenboss11': 'Compiler',
+
+    # Pledge of the Radiant Court
+    'sizhannvshen': 'Bellona',
+    'fuchou': 'Revenge',
 }
 
 
@@ -493,9 +532,9 @@ Arguments:
     IS_WAR_ARCHIVES: True if retrieved map is to be
                      adapted for war_archives usage
 """
-FILE = r'E:\blhx\AzurLaneLuaScripts'
+FILE = ''
 FOLDER = './campaign/test'
-KEYWORD = '1650002'
+KEYWORD = ''
 SELECT = False
 OVERWRITE = True
 IS_WAR_ARCHIVES = False
@@ -506,8 +545,7 @@ DATA = LOADER.load('./sharecfgdata/chapter_template.lua')
 DATA_LOOP = LOADER.load('./sharecfgdata/chapter_template_loop.lua')
 MAP_EVENT_LIST = LOADER.load('./sharecfg/map_event_list.lua')
 MAP_EVENT_TEMPLATE = LOADER.load('./sharecfg/map_event_template.lua')
-EXPECTATION_DATA = LOADER.load('./sharecfg/expedition_data_template.lua')
-
+EXPECTATION_DATA = LOADER.load('./sharecfgdata/expedition_data_template.lua')
 
 def render(tpl_path, **kwargs):
     from jinja2 import Environment, FileSystemLoader

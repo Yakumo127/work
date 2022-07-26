@@ -1,8 +1,8 @@
-from module.campaign.campaign_base import CampaignBase
-from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
-from module.logger import logger
 from campaign.campaign_main.campaign_5_1 import Config as Config51
+from module.campaign.campaign_base import CampaignBase
+from module.logger import logger
+from module.map.map_base import CampaignMap
+from module.map.map_grids import RoadGrids, SelectedGrids
 
 MAP = CampaignMap()
 MAP.shape = 'H5'
@@ -44,6 +44,7 @@ class Config(Config51):
     MAP_MYSTERY_HAS_CARRIER = False
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40
+    HOMO_EDGE_HOUGHLINES_THRESHOLD = 210
 
 
 class Campaign(CampaignBase):

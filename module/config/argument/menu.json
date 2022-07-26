@@ -7,13 +7,20 @@
     ],
     "Farm": [
       "Main",
-      "Event",
-      "Raid",
-      "C11AffinityFarming",
-      "C72MysteryFarming",
-      "C122MediumLeveling",
-      "C124LargeLeveling",
+      "Main2",
+      "Main3",
       "GemsFarming"
+    ],
+    "Event": [
+      "EventGeneral",
+      "Event",
+      "Event2",
+      "EventAb",
+      "EventCd",
+      "EventSp",
+      "Raid",
+      "RaidDaily",
+      "MaritimeEscort"
     ],
     "Reward": [
       "Commission",
@@ -22,37 +29,42 @@
       "Dorm",
       "Meowfficer",
       "Guild",
-      "Reward",
+      "Reward"
+    ],
+    "DailyReward": [
       "ShopFrequent",
       "ShopOnce",
       "Shipyard",
       "Gacha",
-      "DataKey"
+      "DataKey",
+      "SupplyPack",
+      "BattlePass",
+      "MetaReward"
     ],
-    "Daily": [
+    "DailyMission": [
       "Daily",
       "Hard",
       "Exercise",
       "Sos",
-      "EventAb",
-      "EventCd",
-      "EventSp",
-      "RaidDaily",
       "WarArchives"
     ],
     "Opsi": [
       "OpsiGeneral",
       "OpsiAshAssist",
       "OpsiExplore",
+      "OpsiShop",
       "OpsiDaily",
       "OpsiObscure",
+      "OpsiAbyssal",
+      "OpsiStronghold",
       "OpsiMeowfficerFarming"
     ],
     "Tool": [
       "Daemon",
       "OpsiDaemon",
       "Benchmark",
-      "AzurLaneUncensored"
+      "AzurLaneUncensored",
+      "GameManager"
     ]
   }
 }

@@ -10,23 +10,24 @@ class GridInfo:
     which includes boss point, enemy spawn point.
 
     A grid contains these unchangeable properties which can known from WIKI.
-    | print_name | property_name  | description             |
-    |------------|----------------|-------------------------|
-    | ++         | is_land        | fleet can't go to land  |
-    | --         | is_sea         | sea                     |
-    | __         |                | submarine spawn point   |
-    | SP         | is_spawn_point | fleet may spawns here   |
-    | ME         | may_enemy      | enemy may spawns here   |
-    | MB         | may_boss       | boss may spawns here    |
-    | MM         | may_mystery    | mystery may spawns here |
-    | MA         | may_ammo       | fleet can get ammo here |
-    | MS         | may_siren      | Siren/Elite enemy spawn |
+    | print_name | property_name            | description             |
+    |------------|--------------------------|-------------------------|
+    | ++         | is_land                  | fleet can't go to land  |
+    | --         | is_sea                   | sea                     |
+    | __         | is_submarine_spawn_point | submarine spawn point   |
+    | SP         | is_spawn_point           | fleet may spawns here   |
+    | ME         | may_enemy                | enemy may spawns here   |
+    | MB         | may_boss                 | boss may spawns here    |
+    | MM         | may_mystery              | mystery may spawns here |
+    | MA         | may_ammo                 | fleet can get ammo here |
+    | MS         | may_siren                | Siren/Elite enemy spawn |
     """
     is_os = False
 
     # is_sea --
     is_land = False  # ++
     is_spawn_point = False  # SP
+    is_submarine_spawn_point = False  # __
 
     may_enemy = False  # ME
     may_boss = False  # MB
@@ -63,6 +64,8 @@ class GridInfo:
     mechanism_wait = 2  # Seconds to wait the mechanism unlock animation
     is_fortress = False  # Machine fortress
     is_flare = False
+    is_missile_attack = False
+    may_bouncing_enemy = False
     cost = 9999
     cost_1 = 9999
     cost_2 = 9999
@@ -76,6 +79,7 @@ class GridInfo:
         dic = {
             '++': 'is_land',
             'SP': 'is_spawn_point',
+            '__': 'is_submarine_spawn_point',
             'ME': 'may_enemy',
             'MB': 'may_boss',
             'MM': 'may_mystery',
@@ -118,7 +122,9 @@ class GridInfo:
             'MY': 'is_mystery',
             'AM': 'is_ammo',
             'FR': 'is_fortress',
-            '==': 'is_cleared'
+            'MI': 'is_missile_attack',
+            'BE': 'may_bouncing_enemy',
+            '==': 'is_cleared',
         }
         for key, value in dic.items():
             if self.__getattribute__(value):
@@ -174,6 +180,13 @@ class GridInfo:
         Returns:
             bool: If success.
         """
+        # Submarines can be anywhere, so no success/failure in merging info
+        # But expects submarines at spawn points to be found at the beginning
+        if info.is_submarine:
+            if self.is_submarine_spawn_point:
+                self.is_submarine = True
+            else:
+                pass
         if info.is_caught_by_siren:
             if self.is_sea:
                 self.is_fleet = True
@@ -208,9 +221,12 @@ class GridInfo:
             else:
                 return False
         if info.is_enemy:
-            if not self.is_land and (self.may_enemy or self.is_carrier):
+            if self.is_fortress:
+                # Fortress can be a normal enemy
+                return True
+            elif not self.is_land and (self.may_enemy or self.is_carrier or mode == 'decoy'):
                 self.is_enemy = True
-                if info.enemy_scale and not (self.enemy_scale):
+                if info.enemy_scale and not self.enemy_scale:
                     self.enemy_scale = info.enemy_scale
                 if info.enemy_scale == 3 and self.enemy_scale == 2:
                     # But allow 3 overwrites 2
@@ -247,6 +263,16 @@ class GridInfo:
                 return True
             else:
                 return False
+        if info.is_missile_attack:
+            if self.may_siren:
+                self.is_siren = True
+                return True
+            elif self.may_enemy:
+                self.is_enemy = True
+                return True
+            # Allow wrong predictions
+            # else:
+            #     return False
 
         return True
 
@@ -282,6 +308,7 @@ class GridInfo:
         self.is_mechanism_block = False
         self.mechanism_trigger = None
         self.mechanism_block = None
+        self.may_bouncing_enemy = False
 
     def covered_grid(self):
         """Relative coordinate of the covered grid.
@@ -295,3 +322,15 @@ class GridInfo:
             return [(0, -1)]
 
         return []
+
+    def distance_to(self, other):
+        """
+        Args:
+            other (GridInfo):
+
+        Returns:
+            int: Manhattan distance
+        """
+        l1 = self.location
+        l2 = other.location
+        return abs(l1[0] - l2[0]) + abs(l1[1] - l2[1])
