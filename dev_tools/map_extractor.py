@@ -345,7 +345,7 @@ class MapData:
         if IS_WAR_ARCHIVES:
             base_import = 'from ..campaign_war_archives.campaign_base import CampaignBase'
         elif has_modified_campaign_base:
-            base_import = 'from .campaign_base import CampaignBase'
+            base_import = 'from campaign_base import CampaignBase'
         else:
             base_import = 'from module.campaign.campaign_base import CampaignBase'
 
@@ -378,10 +378,10 @@ class MapData:
         # # Config
         self.temp['siren_length'] = len(self.MAP_SIREN_TEMPLATE)
         self.temp['MOVABLE_ENEMY_TURN_tuple'] = tuple(self.MOVABLE_ENEMY_TURN)
-        # for n in range(1, 4):
-        #     if self.__getattribute__(f'STAR_REQUIRE_{n}') != n:
-        #         lines.append(f'    STAR_REQUIRE_{n} = 0')
-        #
+        for n in range(1, 4):
+            if self.__getattribute__(f'STAR_REQUIRE_{n}') != n:
+                Map.star_lines.append(f'    STAR_REQUIRE_{n} = 0')
+
         # # Campaign
         self.temp['ENEMY_FILTER'] = ENEMY_FILTER
         battle = self.data["boss_refresh"]
@@ -421,7 +421,9 @@ class MapData:
                 return False
         print(f'Extract: {file}')
         self.get_file_lines(has_modified_campaign_base=has_modified_campaign_base)
-        res = render(r'E:\blhx\debug\AzurLaneAutoScript\dev_tools\template.jinja', MapData=self)
+        cur_path = os.path.dirname(__file__)
+        jinja_path = os.path.join(cur_path, 'map.jinja')
+        res = render(f'{jinja_path}', MapData=self)
         print(res)
         with open(file, 'w') as f:
             f.write(res)
@@ -546,6 +548,7 @@ DATA_LOOP = LOADER.load('./sharecfgdata/chapter_template_loop.lua')
 MAP_EVENT_LIST = LOADER.load('./sharecfg/map_event_list.lua')
 MAP_EVENT_TEMPLATE = LOADER.load('./sharecfg/map_event_template.lua')
 EXPECTATION_DATA = LOADER.load('./sharecfgdata/expedition_data_template.lua')
+
 
 def render(tpl_path, **kwargs):
     from jinja2 import Environment, FileSystemLoader
