@@ -2,7 +2,7 @@ import os
 import re
 
 from dev_tools.slpp import slpp
-from dev_tools.utils import LuaLoader
+from dev_tools.utils import LuaLoader, temp_render, FOLDER as FILE
 from module.base.utils import location2node
 from module.logger import logger
 from module.map.utils import *
@@ -421,10 +421,7 @@ class MapData:
                 return False
         print(f'Extract: {file}')
         self.get_file_lines(has_modified_campaign_base=has_modified_campaign_base)
-        cur_path = os.path.dirname(__file__)
-        jinja_path = os.path.join(cur_path, 'map.jinja')
-        res = render(f'{jinja_path}', MapData=self)
-        print(res)
+        res = temp_render('map', MapData=self)
         with open(file, 'w') as f:
             f.write(res)
 
@@ -534,10 +531,10 @@ Arguments:
     IS_WAR_ARCHIVES: True if retrieved map is to be
                      adapted for war_archives usage
 """
-FILE = ''
+# FILE = ''
 FOLDER = './campaign/test'
-KEYWORD = ''
-SELECT = False
+KEYWORD = '开幕日'
+SELECT = True
 OVERWRITE = True
 IS_WAR_ARCHIVES = False
 ENEMY_FILTER = '1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C'
@@ -548,14 +545,6 @@ DATA_LOOP = LOADER.load('./sharecfgdata/chapter_template_loop.lua')
 MAP_EVENT_LIST = LOADER.load('./sharecfg/map_event_list.lua')
 MAP_EVENT_TEMPLATE = LOADER.load('./sharecfg/map_event_template.lua')
 EXPECTATION_DATA = LOADER.load('./sharecfgdata/expedition_data_template.lua')
-
-
-def render(tpl_path, **kwargs):
-    from jinja2 import Environment, FileSystemLoader
-    path, filename = os.path.split(tpl_path)
-    env = Environment(loader=FileSystemLoader(path or './'))
-    return env.get_template(filename).render(**kwargs)
-
 
 if __name__ == '__main__':
     ct = ChapterTemplate()
