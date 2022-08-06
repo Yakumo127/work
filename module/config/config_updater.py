@@ -4,6 +4,7 @@ from copy import deepcopy
 from cached_property import cached_property
 
 from deploy.utils import DEPLOY_TEMPLATE, poor_yaml_read, poor_yaml_write
+from dev_tools.utils import temp_render
 from module.base.timer import timer
 from module.config.redirect_utils.shop_filter import bp_redirect
 from module.config.redirect_utils.utils import upload_redirect, api_redirect
@@ -198,7 +199,7 @@ class ConfigGenerator:
         """
         visited_group = set()
         visited_path = set()
-        lines = CONFIG_IMPORT
+        lines = []
         for path, data in deep_iter(self.argument, depth=2):
             group, arg = path
             if group not in visited_group:
@@ -213,9 +214,9 @@ class ConfigGenerator:
             lines.append(f'    {path_to_arg(path)} = {repr(parse_value(data["value"], data=data))}{option}')
             visited_path.add(path)
 
+        res = temp_render('config', Data=lines)
         with open(filepath_code(), 'w', encoding='utf-8', newline='') as f:
-            for text in lines:
-                f.write(text + '\n')
+            f.write(res)
 
     @timer
     def generate_i18n(self, lang):
