@@ -2,6 +2,7 @@ import os
 
 import imageio
 import numpy as np
+from dev_tools.utils import temp_render
 from tqdm.contrib.concurrent import process_map
 
 from module.base.utils import get_bbox, get_color, image_size, load_image
@@ -175,7 +176,7 @@ class ModuleExtractor:
                 continue
 
         logger.info('Module: %s(%s)' % (self.name, len(exp)))
-        exp = IMPORT_EXP + exp
+        # exp = IMPORT_EXP + exp
         return exp
 
     def write(self):
@@ -186,10 +187,18 @@ class ModuleExtractor:
             for text in self.expression:
                 f.write(text + '\n')
 
+    def write_template(self):
+        folder = os.path.join(MODULE_FOLDER, self.name)
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+        res = temp_render('button', Data=self.expression)
+        with open(os.path.join(folder, BUTTON_FILE), 'w', newline='') as f:
+            f.write(res)
+
 
 def worker(module):
     me = ModuleExtractor(name=module)
-    me.write()
+    me.write_template()
 
 
 class AssetExtractor:

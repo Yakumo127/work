@@ -2,7 +2,7 @@ import os
 import re
 
 from dev_tools.slpp import slpp
-from dev_tools.utils import LuaLoader
+from dev_tools.utils import LuaLoader, temp_render, FOLDER as FILE
 from module.base.utils import location2node
 from module.logger import logger
 from module.map.utils import *
@@ -10,6 +10,17 @@ from module.map.utils import *
 """
 This an auto-tool to extract map files used in Alas.
 """
+
+
+class Temp:
+    def __getattr__(self, item):
+        if item not in self.__dict__.keys():
+            if 'lines' in item:
+                self.__setattr__(item, [])
+            elif 'dict' in item:
+                self.__setattr__(item, {})
+        return super().__getattribute__(item)
+
 
 DIC_SIREN_NAME_CHI_TO_ENG = {
     # Siren Winter's Crown, Fallen Wings
@@ -219,9 +230,11 @@ class MapData:
     }
 
     def __init__(self, data, data_loop):
+        self.temp = {}
         self.data = data
         self.data_loop = data_loop
         self.chapter_name = data['chapter_name'].replace('–', '-')
+        self.chap, self.stage = self.chapter_name[:-1], self.chapter_name[-1]
         self.name = data['name']
         self.profiles = data['profiles']
         self.map_id = data['id']
@@ -371,131 +384,50 @@ class MapData:
         if IS_WAR_ARCHIVES:
             base_import = 'from ..campaign_war_archives.campaign_base import CampaignBase'
         elif has_modified_campaign_base:
-            base_import = 'from .campaign_base import CampaignBase'
+            base_import = 'from campaign_base import CampaignBase'
         else:
             base_import = 'from module.campaign.campaign_base import CampaignBase'
 
-        header = f"""
-            {base_import}
-            from module.map.map_base import CampaignMap
-            from module.map.map_grids import SelectedGrids, RoadGrids
-            from module.logger import logger
-        """
-        lines = []
-
         # Import
-        for head in header.strip().split('\n'):
-            lines.append(head.strip())
-        if self.chapter_name[-1].isdigit():
-            chap, stage = self.chapter_name[:-1], self.chapter_name[-1]
-            if stage != '1':
-                lines.append(f'from .{chap.lower()}1 import Config as ConfigBase')
-        lines.append('')
+        self.temp['base_import'] = base_import
+        if self.stage.isdigit() and self.stage != '1':
+            self.temp['x1_flag'] = True
 
         # Map
-        lines.append(f'MAP = CampaignMap(\'{self.chapter_name}\')')
-        lines.append(f'MAP.shape = \'{location2node(self.shape)}\'')
+        Map = Temp()
+        Map.shape = location2node(self.shape)
         camera_data = camera_2d(get_map_active_area(self.map_data), sight=(-3, -1, 3, 2))
-        lines.append(
-            f'MAP.camera_data = {[location2node(loca) for loca in camera_data]}')
+        Map.camera_data = [location2node(loca) for loca in camera_data]
         camera_sp = camera_spawn_point(camera_data, sp_list=[k for k, v in self.map_data.items() if v == 'SP'])
-        lines.append(f'MAP.camera_data_spawn_point = {[location2node(loca) for loca in camera_sp]}')
-        if self.MAP_HAS_PORTAL:
-            lines.append(f'MAP.portal_data = {self.portal}')
-        lines.append('MAP.map_data = \"\"\"')
+        Map.camera_sp = [location2node(loca) for loca in camera_sp]
         for y in range(self.shape[1] + 1):
-            lines.append('    ' + ' '.join([self.map_data[(x, y)] for x in range(self.shape[0] + 1)]))
-        lines.append('\"\"\"')
+            Map.map_lines.append('    ' + ' '.join([self.map_data[(x, y)] for x in range(self.shape[0] + 1)]))
         if self.map_data_loop is not None:
-            lines.append('MAP.map_data_loop = \"\"\"')
             for y in range(self.shape[1] + 1):
-                lines.append('    ' + ' '.join([self.map_data_loop[(x, y)] for x in range(self.shape[0] + 1)]))
-            lines.append('\"\"\"')
-        lines.append('MAP.weight_data = \"\"\"')
+                Map.data_lines.append('    ' + ' '.join([self.map_data_loop[(x, y)] for x in range(self.shape[0] + 1)]))
         for y in range(self.shape[1] + 1):
-            lines.append('    ' + ' '.join(['50'] * (self.shape[0] + 1)))
-        lines.append('\"\"\"')
-        if self.MAP_HAS_LAND_BASED:
-            lines.append(f'MAP.land_based_data = {self.land_based}')
-        lines.append('MAP.spawn_data = [')
+            Map.weight_lines.append('    ' + ' '.join(['50'] * (self.shape[0] + 1)))
         for battle in self.spawn_data:
-            lines.append('    ' + str(battle) + ',')
-        lines.append(']')
+            Map.spawn_lines.append('    ' + str(battle) + ',')
         if self.spawn_data_loop is not None:
-            lines.append('MAP.spawn_data_loop = [')
             for battle in self.spawn_data_loop:
-                lines.append('    ' + str(battle) + ',')
-            lines.append(']')
+                Map.battle_lines.append('    ' + str(battle) + ',')
         for y in range(self.shape[1] + 1):
-            lines.append(', '.join([location2node((x, y)) for x in range(self.shape[0] + 1)]) + ', \\')
-        lines.append('    = MAP.flatten()')
-        lines.append('')
-        lines.append('')
-
-        # Config
-        if self.chapter_name[-1].isdigit():
-            chap, stage = self.chapter_name[:-1], self.chapter_name[-1]
-            if stage != '1':
-                lines.append('class Config(ConfigBase):')
-            else:
-                lines.append('class Config:')
-        else:
-            lines.append('class Config:')
-        lines.append('    # ===== Start of generated config =====')
-        if len(self.MAP_SIREN_TEMPLATE):
-            lines.append(f'    MAP_SIREN_TEMPLATE = {self.MAP_SIREN_TEMPLATE}')
-            lines.append(f'    MOVABLE_ENEMY_TURN = {tuple(self.MOVABLE_ENEMY_TURN)}')
-            lines.append(f'    MAP_HAS_SIREN = True')
-            lines.append(f'    MAP_HAS_MOVABLE_ENEMY = {self.MAP_HAS_MOVABLE_ENEMY}')
-        lines.append(f'    MAP_HAS_MAP_STORY = {self.MAP_HAS_MAP_STORY}')
-        lines.append(f'    MAP_HAS_FLEET_STEP = {self.MAP_HAS_FLEET_STEP}')
-        lines.append(f'    MAP_HAS_AMBUSH = {self.MAP_HAS_AMBUSH}')
-        lines.append(f'    MAP_HAS_MYSTERY = {self.MAP_HAS_MYSTERY}')
-        if self.MAP_HAS_PORTAL:
-            lines.append(f'    MAP_HAS_PORTAL = {self.MAP_HAS_PORTAL}')
-        if self.MAP_HAS_LAND_BASED:
-            lines.append(f'    MAP_HAS_LAND_BASED = {self.MAP_HAS_LAND_BASED}')
+            Map.flatten_lines.append(', '.join([location2node((x, y)) for x in range(self.shape[0] + 1)]) + ', \\')
+        # # Config
+        self.temp['siren_length'] = len(self.MAP_SIREN_TEMPLATE)
+        self.temp['MOVABLE_ENEMY_TURN_tuple'] = tuple(self.MOVABLE_ENEMY_TURN)
         for n in range(1, 4):
             if self.__getattribute__(f'STAR_REQUIRE_{n}') != n:
-                lines.append(f'    STAR_REQUIRE_{n} = 0')
-        lines.append('    # ===== End of generated config =====')
-        lines.append('')
-        lines.append('')
+                Map.star_lines.append(f'    STAR_REQUIRE_{n} = 0')
 
-        # Campaign
+        # # Campaign
+        self.temp['ENEMY_FILTER'] = ENEMY_FILTER
         battle = self.data["boss_refresh"]
-        lines.append('class Campaign(CampaignBase):')
-        lines.append('    MAP = MAP')
-        lines.append(f'    ENEMY_FILTER = \'{ENEMY_FILTER}\'')
-        lines.append('')
-        lines.append('    def battle_0(self):')
-        if len(self.MAP_SIREN_TEMPLATE):
-            lines.append('        if self.clear_siren():')
-            lines.append('            return True')
+        self.temp['battle'] = battle
         preserve = self.data["boss_refresh"] - 5 if battle >= 5 else 0
-        lines.append(f'        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve={preserve}):')
-        lines.append('            return True')
-        lines.append('')
-        lines.append('        return self.battle_default()')
-        lines.append('')
-        if battle >= 6:
-            lines.append('    def battle_5(self):')
-            if len(self.MAP_SIREN_TEMPLATE):
-                lines.append('        if self.clear_siren():')
-                lines.append('            return True')
-            preserve = 0
-            lines.append(f'        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve={preserve}):')
-            lines.append('            return True')
-            lines.append('')
-            lines.append('        return self.battle_default()')
-            lines.append('')
-        lines.append(f'    def battle_{self.data["boss_refresh"]}(self):')
-        if battle >= 5:
-            lines.append('        return self.fleet_boss.clear_boss()')
-        else:
-            lines.append('        return self.clear_boss()')
-
-        return lines
+        self.temp['preserve'] = preserve
+        self.temp.update(Map.__dict__)
 
     def write(self, path):
         file = os.path.join(path, self.map_file_name())
@@ -513,6 +445,24 @@ class MapData:
         with open(file, 'w') as f:
             for text in self.get_file_lines(has_modified_campaign_base=has_modified_campaign_base):
                 f.write(text + '\n')
+
+    def write_template(self, path):
+        file = os.path.join(path, self.map_file_name())
+        has_modified_campaign_base = os.path.exists(os.path.join(path, 'campaign_base.py'))
+        if has_modified_campaign_base:
+            print('Using existing campaign_base.py')
+        if os.path.exists(file):
+            if OVERWRITE:
+                print(f'Delete file: {file}')
+                os.remove(file)
+            else:
+                print(f'File exists: {file}')
+                return False
+        print(f'Extract: {file}')
+        self.get_file_lines(has_modified_campaign_base=has_modified_campaign_base)
+        res = temp_render('map', MapData=self)
+        with open(file, 'w') as f:
+            f.write(res)
 
 
 class ChapterTemplate:
@@ -602,7 +552,7 @@ class ChapterTemplate:
         if not os.path.exists(folder):
             os.mkdir(folder)
         for data in maps:
-            data.write(folder)
+            data.write_template(folder)
 
 
 """
@@ -620,10 +570,10 @@ Arguments:
     IS_WAR_ARCHIVES: True if retrieved map is to be
                      adapted for war_archives usage
 """
-FILE = ''
+# FILE = ''
 FOLDER = './campaign/test'
-KEYWORD = ''
-SELECT = False
+KEYWORD = '开幕日'
+SELECT = True
 OVERWRITE = True
 IS_WAR_ARCHIVES = False
 ENEMY_FILTER = '1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C'
@@ -635,5 +585,6 @@ MAP_EVENT_LIST = LOADER.load('./sharecfg/map_event_list.lua')
 MAP_EVENT_TEMPLATE = LOADER.load('./sharecfg/map_event_template.lua')
 EXPECTATION_DATA = LOADER.load('./sharecfgdata/expedition_data_template.lua')
 
-ct = ChapterTemplate()
-ct.extract(ct.get_chapter_by_name(KEYWORD, select=SELECT), folder=FOLDER)
+if __name__ == '__main__':
+    ct = ChapterTemplate()
+    ct.extract(ct.get_chapter_by_name(KEYWORD, select=SELECT), folder=FOLDER)

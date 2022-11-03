@@ -129,6 +129,14 @@ class LuaLoader:
         return result
 
 
+def temp_render(keyword, **kwargs):
+    from jinja2 import Environment, PackageLoader
+    env = Environment(loader=PackageLoader('dev_tools', 'templates'))
+    return env.get_template(keyword + ".jinja").render(**kwargs)
+
+
+FOLDER = r'D:\bl\AzurLaneLuaScripts'
+
 if __name__ == '__main__':
     # Use example
     lua = LuaLoader(r'xxx/AzurLaneData', server='en-US')
