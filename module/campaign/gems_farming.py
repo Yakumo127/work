@@ -50,16 +50,34 @@ class GemsFleetEmotion(FleetEmotion):
 
 class GemsEmotion(Emotion):
 
-    def __init__(self, config):
+    def __init__(self, config, fleet_index):
         self.config = config
+        self.fleet_index = fleet_index - 1
         self.fleet_1 = GemsFleetEmotion(self.config, fleet=1)
         self.fleet_2 = GemsFleetEmotion(self.config, fleet=2)
         self.fleets = [self.fleet_1, self.fleet_2]
 
+    def update(self):
+        self.fleets[self.fleet_index].update()
+
+    def record(self):
+        fleet = self.fleets[self.fleet_index]
+        self.config.set_record(**{fleet.value_name: fleet.current})
+
+    def show(self):
+        fleet = self.fleets[self.fleet_index]
+        logger.attr(f'Emotion fleet_{fleet.fleet}', fleet.value)
+
     def check_reduce(self, battle):
         if not self.is_calculate:
             return
-        recovered = self.predict_recovered(battle)
+
+        emotion_reduce = battle * self.reduce_per_battle_before_entering
+        logger.info(f'Expect emotion reduce: {emotion_reduce}')
+        self.update()
+        self.record()
+        self.show()
+        recovered = self.fleets[self.fleet_index].get_recovered(emotion_reduce)
         if recovered > datetime.now():
             logger.hr('EMOTION CONTROL')
             raise CampaignEnd('Emotion control')
@@ -67,11 +85,18 @@ class GemsEmotion(Emotion):
     def wait(self, fleet_index):
         pass
 
-    def triggered_bug(self):
-        return False
+    def reduce(self, fleet_index):
+        logger.hr('Emotion reduce')
+        if fleet_index - 1 != self.fleet_index:
+            logger.warning('Fleet index does not match')
 
-    def reset(self, fleet, emotion):
-        self.fleets[fleet - 1].reset(emotion)
+        self.update()
+        self.fleets[self.fleet_index].current -= self.reduce_per_battle
+        self.record()
+        self.show()
+
+    def reset(self, emotion):
+        self.fleets[self.fleet_index].reset(emotion)
 
 
 class GemsCampaignOverride(CampaignBase):
@@ -120,7 +145,10 @@ class GemsCampaignOverride(CampaignBase):
 
     @cached_property
     def emotion(self) -> GemsEmotion:
-        return GemsEmotion(config=self.config)
+        fleet_index = 1
+        if self.config.Fleet_FleetOrder == 'fleet1_standby_fleet2_all':
+            fleet_index = 2
+        return GemsEmotion(self.config, fleet_index)
 
 
 class GemsFarming(CampaignRun, FleetEquipment, Dock):
@@ -138,13 +166,6 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         else:
             self.campaign.config.override(Emotion_Mode='ignore')
         self.emotion_expected_reduce = self.campaign._map_battle * 2
-
-    @property
-    def fleet_index_to_attack(self):
-        if self.config.Fleet_FleetOrder == 'fleet1_all_fleet2_standby':
-            return 1
-        else:
-            return 2
 
     @property
     def change_flagship(self):
@@ -485,7 +506,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
                 if self.change_vanguard:
                     success = success and self.vanguard_change()
                 if self.change_flagship or self.change_vanguard:
-                    self.campaign.emotion.reset(self.fleet_index_to_attack, self._new_emotion_value)
+                    self.campaign.emotion.reset(self._new_emotion_value)
 
                 if is_limit and self.config.StopCondition_RunCount <= 0:
                     logger.hr('Triggered stop condition: Run count')
