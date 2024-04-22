@@ -1878,7 +1878,7 @@
     },
     "Emotion": {
       "Mode": {
-        "type": "select",
+        "type": "stored",
         "value": "calculate",
         "option": [
           "calculate",

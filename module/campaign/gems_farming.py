@@ -133,6 +133,10 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
         self.campaign: GemsCampaign = GemsCampaign(device=self.campaign.device, config=self.campaign.config)
         self.campaign.config.override(EnemyPriority_EnemyScaleBalanceWeight='S1_enemy_first')
+        if self.change_flagship or self.change_vanguard:
+            self.campaign.config.override(Emotion_Mode='calculate')
+        else:
+            self.campaign.config.override(Emotion_Mode='ignore')
         self.emotion_expected_reduce = self.campaign._map_battle * 2
 
     @property
@@ -480,7 +484,8 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
                     success = self.flagship_change()
                 if self.change_vanguard:
                     success = success and self.vanguard_change()
-                self.campaign.emotion.reset(self.fleet_index_to_attack, self._new_emotion_value)
+                if self.change_flagship or self.change_vanguard:
+                    self.campaign.emotion.reset(self.fleet_index_to_attack, self._new_emotion_value)
 
                 if is_limit and self.config.StopCondition_RunCount <= 0:
                     logger.hr('Triggered stop condition: Run count')
