@@ -441,6 +441,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             logger.info('Keep 1000 AP when CL1 available')
             if not self.action_point_check(1000):
                 self.config.opsi_task_delay(cl1_preserve=True)
+                self.config.task_call('OpsiHazard1Leveling')
                 self.config.task_stop()
 
     _auto_search_battle_count = 0
