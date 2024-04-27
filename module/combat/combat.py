@@ -366,7 +366,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
-    def handle_get_ship(self, drop=None):
+    def handle_get_ship(self, drop=None, skip_first_screenshot=True):
         """
         Args:
             drop (DropImage):
@@ -374,15 +374,33 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         Returns:
             bool:
         """
-        if self.appear_then_click(GET_SHIP, interval=1):
+        if not self.appear(GET_SHIP):
+            return False
+        
+        confirm_timer = Timer(1)
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
+            
+            # End
+            if confirm_timer.reached():
+                break
+
             if self.appear(NEW_SHIP):
                 logger.info('Get a new SHIP')
                 if drop:
                     drop.handle_add(self)
+                with self.stat.new(
+                    genre='new_ship',
+                    method=self.config.DropRecord_NewShipRecord
+                ) as drop2:
+                    drop2.handle_add(self, before=1.0)
                 self.config.GET_SHIP_TRIGGERED = True
-            return True
-
-        return False
+                break
+        self.device.click(GET_SHIP)
+        return True
 
     def handle_combat_mis_click(self):
         """
