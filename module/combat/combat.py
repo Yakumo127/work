@@ -377,7 +377,11 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         if not self.appear(GET_SHIP):
             return False
         
-        confirm_timer = Timer(1)
+        if 'save' in self.config.DropRecord_NewShipRecord:
+            confirm_timer = Timer(5)
+        else:
+            confirm_timer = Timer(1)
+            
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
