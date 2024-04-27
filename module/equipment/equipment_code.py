@@ -12,6 +12,9 @@ BASE64_REGEX = re.compile('^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-
 
 
 def is_equip_code(string):
+    """
+    Checks if current string is None or BASE64 string.
+    """
     if string is None:
         return True
     if not isinstance(string, str):
@@ -46,14 +49,12 @@ class EquipmentCode:
         self.config_key = key
         self.coded_ships = ships
         _config = config.cross_get(keys=key)
-        # print(_config)
         codes = dict([(ship, None) for ship in self.coded_ships])
         for line in _config.splitlines():
             try:
                 codes.update(yaml.safe_load(line))
             except Exception as e:
                 logger.error(f'Failed to parse current line of the config: "{line}", skipping')
-        # print(codes)
         for ship in self.coded_ships:
             code: str = codes.pop(ship, None)
             self.__setattr__(ship, code)
@@ -66,7 +67,6 @@ class EquipmentCode:
         for ship in self.coded_ships:
             _config.update({ship: self.__getattribute__(ship)})
         value = yaml.safe_dump(_config)
-        # print(value)
         self.config.cross_set(keys=self.config_key, value=value)
 
 
@@ -193,7 +193,7 @@ class EquipmentCodeHandler(StorageHandler):
             if self.appear_then_click(EQUIPMENT_CODE_CONFIRM, interval=5):
                 continue
 
-            if self.handle_popup_confirm('GEAR_CODE'):
+            if self.handle_popup_confirm('EQUIPMENT_CODE'):
                 continue
 
             # End
@@ -224,10 +224,7 @@ class EquipmentCodeHandler(StorageHandler):
             code = self.codes.__getattribute__(ship)
         while 1:
             self.enter_equip_code_input_mode()
-            try:
-                self.device.text_input_and_confirm(code, clear=True)
-            except EnvironmentError as e:
-                continue
+            self.device.text_input_and_confirm(code, clear=True)
             self.confirm_equip_code()
             success = self.confirm_equip_preview()
             if success:
@@ -235,13 +232,3 @@ class EquipmentCodeHandler(StorageHandler):
             else:
                 self.handle_storage_full()
                 self.clear_equip_preview()
-
-
-if __name__=="__main__":
-    config = AzurLaneConfig('alas')
-    key = "GemsFarming.GemsFarming.EquipmentCode"
-    ships = ['DD', 'bogue', 'hermes', 'langley', 'ranger']
-    self = EquipmentCodeHandler(config, key=key, ships=ships)
-    print(self.codes.hermes)
-    # self.codes.export_to_config(config)
-    # print(self.GemsFarming_EquipmentCode)
