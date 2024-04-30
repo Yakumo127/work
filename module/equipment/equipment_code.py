@@ -67,6 +67,7 @@ class EquipmentCode:
         for ship in self.coded_ships:
             _config.update({ship: self.__getattribute__(ship)})
         value = yaml.safe_dump(_config)
+        logger.info(f'Gear code configs to be exported: {value}')
         self.config.cross_set(keys=self.config_key, value=value)
 
 
@@ -129,8 +130,11 @@ class EquipmentCodeHandler(StorageHandler):
                 continue
         
         code = self.device.clipboard
+        logger.attr("Gear code", code)
         if not ship in self.codes.coded_ships:
             ship = self.current_ship()
+        logger.attr("Current ship", ship)
+        logger.info(f'Set gear code of {ship} to be {code}')
         self.codes.__setattr__(ship, code)
         self.codes.export_to_config()
 
@@ -149,6 +153,7 @@ class EquipmentCodeHandler(StorageHandler):
 
             # End
             if self.equip_preview_empty():
+                logger.info('Confirm equipment preview cleared.')
                 break
 
             if self.appear_then_click(EQUIPMENT_CODE_CLEAR):
@@ -170,6 +175,7 @@ class EquipmentCodeHandler(StorageHandler):
                 break
 
     def confirm_equip_code(self, skip_first_screenshot=False):
+        check_counter = 0
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -181,7 +187,13 @@ class EquipmentCodeHandler(StorageHandler):
 
             # End
             if not self.equip_preview_empty():
-                break
+                logger.info('Confirm gear code loaded.')
+                return True
+            else:
+                check_counter += 1
+                if check_counter >= 5:
+                    logger.error('Gear code load failed, retrying.')
+                    return False
 
     def confirm_equip_preview(self, skip_first_screenshot=True):
         while 1:
@@ -222,12 +234,18 @@ class EquipmentCodeHandler(StorageHandler):
         if code is None:
             ship = self.current_ship()
             code = self.codes.__getattribute__(ship)
+            logger.info(f'Apply gear code {code} for {ship}')
+        else:
+            logger.info(f'Forcefully apply gear code {code} to current ship.')
         while 1:
             self.enter_equip_code_input_mode()
             self.device.text_input_and_confirm(code, clear=True)
-            self.confirm_equip_code()
+            success = self.confirm_equip_code()
+            if not success:
+                continue
             success = self.confirm_equip_preview()
             if success:
+                logger.info("Gear code import complete.")
                 break
             else:
                 self.handle_storage_full()
