@@ -381,7 +381,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             confirm_timer = Timer(5)
         else:
             confirm_timer = Timer(1)
-            
+        
+        confirm_timer.start()
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
