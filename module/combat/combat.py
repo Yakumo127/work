@@ -374,11 +374,11 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         Returns:
             bool:
         """
-        if not self.appear(GET_SHIP, interval=1):
+        if not self.appear(GET_SHIP, interval=5):
             return False
         
         if 'save' in self.config.DropRecord_NewShipRecord:
-            confirm_timer = Timer(5)
+            confirm_timer = Timer(3)
         else:
             confirm_timer = Timer(1)
         
