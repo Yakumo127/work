@@ -170,7 +170,7 @@ class OSTargetHandler(OSTarget, Combat, UI):
         Returns:
             found_zone(int): The zone id with unfinished safe star. If such zone does not exist, return 0.
         """
-        last_zone = self.config.OpsiCollection_LastZone
+        last_zone = self.config.OpsiTarget_TargetZone
         info_timer = Timer(1)
         
         while 1:
