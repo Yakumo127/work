@@ -377,7 +377,12 @@ class OperationSiren(OSMap):
                     .sort_by_clock_degree(center=(1252, 1012), start=self.zone.location)
 
                 logger.hr(f'OS meowfficer farming, zone_id={zones[0].zone_id}', level=1)
-                self.globe_goto(zones[0])
+                try:
+                    self.globe_goto(zones[0])
+                except ActionPointLimit:
+                    if self.is_cl1_enabled and self.get_yellow_coins() >= self.config.OS_CL1_YELLOW_COINS_PRESERVE:
+                        self.config.task_call('OpsiHazard1Leveling')
+                    raise ActionPointLimit
                 self.fleet_set(self.config.OpsiFleet_Fleet)
                 self.os_order_execute(
                     recon_scan=False,
