@@ -426,6 +426,7 @@ class Camera(MapOperation):
         if must_scan:
             queue = queue.add(must_scan)
 
+        failed_count = 0
         while len(queue) > 0:
             if self.map.missing_is_none(battle_count, mystery_count, siren_count, carrier_count, mode):
                 if must_scan and queue.count != queue.delete(must_scan).count:
@@ -440,9 +441,13 @@ class Camera(MapOperation):
             self.focus_to_grid_center(0.25)
             success = self.map.update(grids=self.view, camera=self.camera, mode=mode)
             if not success:
+                failed_count += 1
+                if failed_count > 4:
+                    raise MapDetectionError('Too many wrong prediction')
                 self.ensure_edge_insight(skip_first_update=False)
                 continue
 
+            failed_count = 0
             queue = queue[1:]
 
         self.map.missing_predict(battle_count, mystery_count, siren_count, carrier_count, mode)
