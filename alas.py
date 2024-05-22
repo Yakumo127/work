@@ -121,6 +121,11 @@ class AzurLaneAutoScript:
                 content=f"<{self.config_name}> RequestHumanTakeover",
             )
             exit(1)
+        except EmulatorNotRunningError as e:
+            logger.warning(e)
+            self.device.emulator_start()
+            time.sleep(10)
+            self.config.task_call('Restart')
         except Exception as e:
             logger.exception(e)
             self.save_error_log()
@@ -462,6 +467,17 @@ class AzurLaneAutoScript:
                     if not self.wait_until(task.next_run):
                         del_cached_property(self, 'config')
                         continue
+                elif method == 'stop_emulator':
+                    logger.info('Stop emulator during wait')
+                    self.device.emulator_stop()
+                    release_resources() 
+                    self.device.release_during_wait()
+                    if not self.wait_until(task.next_run):
+                        self.device.emulator_start()
+                        time.sleep(10)
+                        self.config.task_call('Restart')
+                        del_cached_property(self, 'config')
+                        continue
                 else:
                     logger.warning(f'Invalid Optimization_WhenTaskQueueEmpty: {method}, fallback to stay_there')
                     release_resources()
@@ -495,10 +511,10 @@ class AzurLaneAutoScript:
                 del_cached_property(self, 'config')
                 logger.info('Server or network is recovered. Restart game client')
                 self.config.task_call('Restart')
-            # Get task
-            task = self.get_next_task()
             # Init device and change server
             _ = self.device
+            # Get task
+            task = self.get_next_task()
             # Skip first restart
             if self.is_first_task and task == 'Restart':
                 logger.info('Skip task `Restart` at scheduler start')
