@@ -8418,9 +8418,29 @@
       }
     },
     "OpsiShop": {
-      "BuySupply": {
-        "type": "checkbox",
-        "value": true
+      "BuyFrequency": {
+        "type": "select",
+        "value": "weekly",
+        "option": [
+          "everyday",
+          "weekly",
+          "week_before_reset"
+        ]
+      },
+      "PresetFilter": {
+        "type": "select",
+        "value": "max_benefit",
+        "option": [
+          "max_benefit",
+          "max_benefit_meta",
+          "max_benefit_exploration",
+          "all",
+          "custom"
+        ]
+      },
+      "CustomFilter": {
+        "type": "textarea",
+        "value": "Logger"
       }
     },
     "Storage": {
